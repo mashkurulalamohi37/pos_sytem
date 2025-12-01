@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "212072997600",
+    "project_id": "possystem-e1655",
+    "storage_bucket": "possystem-e1655.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:212072997600:android:272f5ca99306a8efda2685",
+        "android_client_info": {
+          "package_name": "com.example.aronium"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjjzp6qBMlBvbnv7hBKQR16P4SicqWAMM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
