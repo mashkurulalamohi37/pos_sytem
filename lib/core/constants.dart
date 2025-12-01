@@ -23,5 +23,9 @@ class AppConstants {
   static const String paymentCard = 'card';
   static const String paymentMobile = 'mobile';
   static const String paymentOther = 'other';
+
+  // Loyalty Points
+  // Points earned per TK spent (e.g., 0.01 means 1 point per 100 TK)
+  static const double loyaltyPointsRate = 0.01; // 1 point per 100 TK
 }
 

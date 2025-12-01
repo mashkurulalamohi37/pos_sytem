@@ -3,6 +3,7 @@ import '../../domain/entities/product.dart';
 import '../../domain/repositories/product_repository.dart';
 import '../../domain/repositories/sale_repository.dart';
 import '../../domain/repositories/inventory_repository.dart';
+import '../../domain/repositories/customer_repository.dart';
 import '../../domain/entities/sale.dart';
 import '../../domain/entities/sale_item.dart';
 import '../../domain/entities/stock_movement.dart';
@@ -85,11 +86,13 @@ class PosNotifier extends StateNotifier<PosState> {
   final ProductRepository _productRepository;
   final SaleRepository _saleRepository;
   final InventoryRepository _inventoryRepository;
+  final CustomerRepository _customerRepository;
 
   PosNotifier(
     this._productRepository,
     this._saleRepository,
     this._inventoryRepository,
+    this._customerRepository,
   ) : super(PosState());
 
   void addToCart(Product product, {int quantity = 1}) {
@@ -230,6 +233,24 @@ class PosNotifier extends StateNotifier<PosState> {
 
       await _saleRepository.createSale(sale, saleItems);
 
+      // Update loyalty points if customer is associated
+      if (sale.customerId != null) {
+        try {
+          final customer = await _customerRepository.getCustomerById(sale.customerId!);
+          if (customer != null) {
+            // Calculate loyalty points earned (based on total amount)
+            final pointsEarned = sale.totalAmount * AppConstants.loyaltyPointsRate;
+            final newLoyaltyPoints = customer.loyaltyPoints + pointsEarned;
+            
+            // Update customer's loyalty points
+            await _customerRepository.updateLoyaltyPoints(sale.customerId!, newLoyaltyPoints);
+          }
+        } catch (e) {
+          // If loyalty points update fails, log but don't fail the sale
+          print('Error updating loyalty points: $e');
+        }
+      }
+
       // Update stock levels
       for (final cartItem in state.cartItems) {
         await _inventoryRepository.createStockMovement(
@@ -282,6 +303,7 @@ final posProvider = StateNotifierProvider<PosNotifier, PosState>((ref) {
   final productRepo = ref.watch(productRepositoryProvider);
   final saleRepo = ref.watch(saleRepositoryProvider);
   final inventoryRepo = ref.watch(inventoryRepositoryProvider);
-  return PosNotifier(productRepo, saleRepo, inventoryRepo);
+  final customerRepo = ref.watch(customerRepositoryProvider);
+  return PosNotifier(productRepo, saleRepo, inventoryRepo, customerRepo);
 });
 

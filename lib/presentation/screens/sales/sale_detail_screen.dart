@@ -5,8 +5,10 @@ import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../providers/sale_provider.dart';
+import '../../providers/repository_providers.dart';
 import '../../../domain/entities/sale.dart';
 import '../../../domain/entities/sale_item.dart';
+import '../../../domain/entities/customer.dart';
 
 class SaleDetailScreen extends ConsumerStatefulWidget {
   final Sale sale;
@@ -37,6 +39,18 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
 
   Future<void> _printReceipt() async {
     if (_saleItems == null) return;
+
+    // Fetch customer if customerId exists
+    Customer? customer;
+    if (widget.sale.customerId != null) {
+      try {
+        final customerRepo = ref.read(customerRepositoryProvider);
+        customer = await customerRepo.getCustomerById(widget.sale.customerId!);
+      } catch (e) {
+        // If customer fetch fails, continue without customer info
+        print('Error fetching customer: $e');
+      }
+    }
 
     // Calculate totals
     final subtotalBeforeDiscounts = _saleItems!.fold<double>(
@@ -102,6 +116,33 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                   ],
                 ),
               ),
+              // Customer Information
+              if (customer != null) ...[
+                pw.SizedBox(height: 6),
+                pw.Divider(thickness: 0.5),
+                pw.SizedBox(height: 4),
+                pw.Center(
+                  child: pw.Column(
+                    children: [
+                      pw.Text(
+                        'Customer:',
+                        style: pw.TextStyle(fontSize: 9, color: PdfColor.fromInt(0xFF616161)),
+                      ),
+                      pw.Text(
+                        customer.name,
+                        style: const pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                      ),
+                      if (customer.phone != null && customer.phone!.isNotEmpty) ...[
+                        pw.SizedBox(height: 2),
+                        pw.Text(
+                          'Phone: ${customer.phone}',
+                          style: const pw.TextStyle(fontSize: 9),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
               pw.SizedBox(height: 6),
               pw.Divider(thickness: 1),
               pw.SizedBox(height: 4),

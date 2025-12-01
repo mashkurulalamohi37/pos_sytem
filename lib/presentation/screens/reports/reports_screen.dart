@@ -4,8 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' if (dart.library.html) 'dart:html' as io;
 import '../../providers/sale_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../../domain/entities/sale.dart';
@@ -78,17 +79,23 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ]),
       ];
 
-      final csvString = const ListToCsvConverter().convert(csvData);
-      final fileName = 'sales_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
+        final csvString = const ListToCsvConverter().convert(csvData);
+        final fileName = 'sales_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
 
-      final directory = await getTemporaryDirectory();
-      final file = File('${directory.path}/$fileName');
-      await file.writeAsString(csvString);
-
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'Sales Report',
-      );
+        if (kIsWeb) {
+          // For web, use share_plus with text directly
+          await Share.share(csvString, subject: 'Sales Report');
+        } else {
+          // For mobile platforms (iOS/Android)
+          final directory = await getTemporaryDirectory();
+          final file = io.File('${directory.path}/$fileName');
+          await file.writeAsString(csvString);
+          
+          await Share.shareXFiles(
+            [XFile(file.path)],
+            text: 'Sales Report',
+          );
+        }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
