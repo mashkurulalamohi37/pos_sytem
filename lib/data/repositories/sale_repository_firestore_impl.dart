@@ -43,6 +43,7 @@ class SaleRepositoryFirestoreImpl implements SaleRepository {
         'unitPrice': item.unitPrice,
         'quantity': item.quantity,
         'discount': item.discount,
+        'taxAmount': item.taxAmount,
         'total': item.total,
         'createdAt': Timestamp.fromDate(now),
       });
@@ -173,6 +174,7 @@ class SaleRepositoryFirestoreImpl implements SaleRepository {
       unitPrice: (data['unitPrice'] as num?)?.toDouble() ?? 0.0,
       quantity: (data['quantity'] as num?)?.toInt() ?? 0,
       discount: (data['discount'] as num?)?.toDouble() ?? 0.0,
+      taxAmount: (data['taxAmount'] as num?)?.toDouble() ?? 0.0,
       total: (data['total'] as num?)?.toDouble() ?? 0.0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );

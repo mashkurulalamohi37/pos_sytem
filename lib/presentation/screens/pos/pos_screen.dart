@@ -142,8 +142,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     products: productsState.filteredProducts,
                     isLoading: productsState.isLoading,
                     cartItems: posState.cartItems,
-                    onProductTap: (product) {
-                      ref.read(posProvider.notifier).toggleProductInCart(product);
+                    onProductTap: (product) async {
+                      await ref.read(posProvider.notifier).toggleProductInCart(product);
                     },
                   ),
                 ),
@@ -298,8 +298,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           products: productsState.filteredProducts,
                           isLoading: productsState.isLoading,
                           cartItems: posState.cartItems,
-                          onProductTap: (product) {
-                            ref.read(posProvider.notifier).toggleProductInCart(product);
+                          onProductTap: (product) async {
+                            await ref.read(posProvider.notifier).toggleProductInCart(product);
                           },
                         ),
                       ),
@@ -379,7 +379,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             
             if (product != null) {
               // Add product to cart
-              ref.read(posProvider.notifier).addToCart(product);
+              await ref.read(posProvider.notifier).addToCart(product);
               
               // Close scanner and show success message
               if (scannerContext.mounted) {

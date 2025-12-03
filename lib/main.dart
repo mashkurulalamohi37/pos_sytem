@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/users/users_screen.dart';
+import 'presentation/screens/tax_rates/tax_rates_screen.dart';
 import 'presentation/providers/auth_provider.dart';
 
 void main() async {
@@ -35,6 +36,7 @@ class AroniumApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
         '/users': (context) => const UsersScreen(),
+        '/tax-rates': (context) => const TaxRatesScreen(),
       },
     );
   }

@@ -8,6 +8,7 @@ class SaleItem extends Equatable {
   final double unitPrice;
   final int quantity;
   final double discount;
+  final double taxAmount; // Tax amount for this item
   final double total;
   final DateTime createdAt;
 
@@ -19,6 +20,7 @@ class SaleItem extends Equatable {
     required this.unitPrice,
     required this.quantity,
     this.discount = 0.0,
+    this.taxAmount = 0.0,
     required this.total,
     required this.createdAt,
   });
@@ -32,6 +34,7 @@ class SaleItem extends Equatable {
         unitPrice,
         quantity,
         discount,
+        taxAmount,
         total,
         createdAt,
       ];

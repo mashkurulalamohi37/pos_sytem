@@ -13,6 +13,8 @@ class Product extends Equatable {
   final String unit;
   final String? description;
   final bool isActive;
+  final List<int> taxRateIds; // List of tax rate IDs (for multiple taxes)
+  final bool priceIncludesTax; // Whether the selling price includes tax
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -29,6 +31,8 @@ class Product extends Equatable {
     this.unit = 'pcs',
     this.description,
     this.isActive = true,
+    this.taxRateIds = const [],
+    this.priceIncludesTax = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -50,6 +54,8 @@ class Product extends Equatable {
         unit,
         description,
         isActive,
+        taxRateIds,
+        priceIncludesTax,
         createdAt,
         updatedAt,
       ];

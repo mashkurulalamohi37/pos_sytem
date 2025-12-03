@@ -95,6 +95,19 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
           ],
+          if ((user?.isAdmin ?? false) || (user?.isManager ?? false)) ...[
+            _buildSectionTitle('Configuration'),
+            _buildSettingTile(
+              context,
+              icon: Icons.receipt_long,
+              title: 'Tax Rates',
+              subtitle: 'Manage tax rates for products',
+              onTap: () {
+                Navigator.pushNamed(context, '/tax-rates');
+              },
+            ),
+            const SizedBox(height: 24),
+          ],
           _buildSectionTitle('General'),
           _buildSettingTile(
             context,

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/product_provider.dart';
+import '../../providers/tax_rate_provider.dart';
 import '../../../domain/entities/product.dart';
 import '../../../domain/entities/category.dart';
+import '../../../domain/entities/tax_rate.dart';
 import '../../widgets/barcode_scanner_widget.dart';
 
 class ProductFormScreen extends ConsumerStatefulWidget {
@@ -27,6 +29,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   final _unitController = TextEditingController();
 
   int? _selectedCategoryId;
+  List<int> _selectedTaxRateIds = [];
+  bool _priceIncludesTax = false;
   bool _isActive = true;
   bool _isLoading = false;
 
@@ -44,6 +48,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       _descriptionController.text = widget.product!.description ?? '';
       _unitController.text = widget.product!.unit;
       _selectedCategoryId = widget.product!.categoryId;
+      _selectedTaxRateIds = List<int>.from(widget.product!.taxRateIds);
+      _priceIncludesTax = widget.product!.priceIncludesTax;
       _isActive = widget.product!.isActive;
     } else {
       _lowStockThresholdController.text = '10';
@@ -116,6 +122,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
             ? null
             : _descriptionController.text.trim(),
         isActive: _isActive,
+        taxRateIds: _selectedTaxRateIds,
+        priceIncludesTax: _priceIncludesTax,
         createdAt: widget.product?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -400,16 +408,97 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               maxLines: 3,
             ),
             const SizedBox(height: 16),
-            // Active Status
-            SwitchListTile(
-              title: const Text('Active'),
-              subtitle: const Text('Product will be visible in POS'),
-              value: _isActive,
-              onChanged: (value) {
-                setState(() {
-                  _isActive = value;
-                });
+            // Tax Rates Selection
+            Consumer(
+              builder: (context, ref, child) {
+                final taxRateState = ref.watch(taxRateProvider);
+                return Card(
+                  child: ExpansionTile(
+                    leading: const Icon(Icons.receipt_long),
+                    title: const Text('Tax Rates'),
+                    subtitle: Text(
+                      _selectedTaxRateIds.isEmpty
+                          ? 'No tax rates selected'
+                          : '${_selectedTaxRateIds.length} tax rate(s) selected',
+                    ),
+                    children: [
+                      if (taxRateState.isLoading)
+                        const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (taxRateState.taxRates.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            children: [
+                              Text(
+                                'No tax rates available',
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                              const SizedBox(height: 8),
+                              TextButton.icon(
+                                icon: const Icon(Icons.add),
+                                label: const Text('Create Tax Rate'),
+                                onPressed: () {
+                                  Navigator.pushNamed(context, '/tax-rates');
+                                },
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        ...taxRateState.taxRates.map((taxRate) {
+                          final isSelected = _selectedTaxRateIds.contains(taxRate.id);
+                          return CheckboxListTile(
+                            title: Text(taxRate.name),
+                            subtitle: Text('${taxRate.rate.toStringAsFixed(2)}%'),
+                            value: isSelected,
+                            onChanged: (value) {
+                              setState(() {
+                                if (value == true) {
+                                  if (taxRate.id != null) {
+                                    _selectedTaxRateIds.add(taxRate.id!);
+                                  }
+                                } else {
+                                  _selectedTaxRateIds.remove(taxRate.id);
+                                }
+                              });
+                            },
+                          );
+                        }),
+                    ],
+                  ),
+                );
               },
+            ),
+            const SizedBox(height: 16),
+            // Price Includes Tax
+            Card(
+              child: SwitchListTile(
+                title: const Text('Price Includes Tax'),
+                subtitle: const Text('Selling price already includes tax'),
+                value: _priceIncludesTax,
+                onChanged: (value) {
+                  setState(() {
+                    _priceIncludesTax = value;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Active Status
+            Card(
+              child: SwitchListTile(
+                title: const Text('Active'),
+                subtitle: const Text('Product will be visible in POS'),
+                value: _isActive,
+                onChanged: (value) {
+                  setState(() {
+                    _isActive = value;
+                  });
+                },
+              ),
             ),
             const SizedBox(height: 24),
             // Save Button

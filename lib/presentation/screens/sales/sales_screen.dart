@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../providers/sale_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../../domain/entities/sale.dart';
+import '../../../core/constants.dart';
 import 'sale_detail_screen.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
@@ -296,7 +297,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            sale.paymentMethod.toUpperCase(),
+                            AppConstants.getPaymentMethodName(sale.paymentMethod),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
@@ -375,6 +376,16 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         return Colors.green;
       case 'card':
         return Colors.blue;
+      case 'bkash':
+        return Colors.orange;
+      case 'nagad':
+        return Colors.purple;
+      case 'rocket':
+        return Colors.red;
+      case 'advance':
+        return Colors.teal;
+      case 'due':
+        return Colors.amber;
       default:
         return Colors.grey;
     }

@@ -4,6 +4,7 @@ import '../../domain/repositories/product_repository.dart';
 import '../../domain/repositories/sale_repository.dart';
 import '../../domain/repositories/inventory_repository.dart';
 import '../../domain/repositories/customer_repository.dart';
+import '../../domain/repositories/tax_rate_repository.dart';
 import '../../domain/entities/sale.dart';
 import '../../domain/entities/sale_item.dart';
 import '../../domain/entities/stock_movement.dart';
@@ -22,7 +23,6 @@ class PosState {
   final List<CartItem> cartItems;
   final DiscountType discountType;
   final double discountValue; // Fixed amount in TK or percentage
-  final double taxRate;
   final String? selectedCustomerId;
   final String paymentMethod;
 
@@ -30,35 +30,38 @@ class PosState {
     this.cartItems = const [],
     this.discountType = DiscountType.none,
     this.discountValue = 0.0,
-    this.taxRate = 0.0,
     this.selectedCustomerId,
     this.paymentMethod = AppConstants.paymentCash,
   });
 
+  // Subtotal before discounts (sum of all item subtotals)
   double get subtotal {
-    return cartItems.fold(0.0, (sum, item) => sum + item.total);
+    return cartItems.fold(0.0, (sum, item) => sum + item.subtotal);
   }
 
+  // Total tax from all items
+  double get taxAmount {
+    return cartItems.fold(0.0, (sum, item) => sum + item.totalTaxAmount);
+  }
+
+  // Discount amount
   double get discountAmount {
     if (discountType == DiscountType.none) return 0.0;
     if (discountType == DiscountType.fixed) {
       // Fixed amount discount (in TK)
       return discountValue;
     } else {
-      // Percentage discount
+      // Percentage discount on subtotal
       return subtotal * (discountValue / 100);
     }
   }
 
+  // Subtotal after discount
   double get subtotalAfterDiscount {
     return subtotal - discountAmount;
   }
 
-  double get taxAmount {
-    // Tax is calculated on subtotal after discount
-    return subtotalAfterDiscount * (taxRate / 100);
-  }
-
+  // Total amount (subtotal after discount + tax)
   double get totalAmount {
     return subtotalAfterDiscount + taxAmount;
   }
@@ -67,7 +70,6 @@ class PosState {
     List<CartItem>? cartItems,
     DiscountType? discountType,
     double? discountValue,
-    double? taxRate,
     String? selectedCustomerId,
     String? paymentMethod,
   }) {
@@ -75,7 +77,6 @@ class PosState {
       cartItems: cartItems ?? this.cartItems,
       discountType: discountType ?? this.discountType,
       discountValue: discountValue ?? this.discountValue,
-      taxRate: taxRate ?? this.taxRate,
       selectedCustomerId: selectedCustomerId ?? this.selectedCustomerId,
       paymentMethod: paymentMethod ?? this.paymentMethod,
     );
@@ -87,15 +88,28 @@ class PosNotifier extends StateNotifier<PosState> {
   final SaleRepository _saleRepository;
   final InventoryRepository _inventoryRepository;
   final CustomerRepository _customerRepository;
+  final TaxRateRepository _taxRateRepository;
 
   PosNotifier(
     this._productRepository,
     this._saleRepository,
     this._inventoryRepository,
     this._customerRepository,
+    this._taxRateRepository,
   ) : super(PosState());
 
-  void addToCart(Product product, {int quantity = 1}) {
+  Future<void> addToCart(Product product, {int quantity = 1}) async {
+    // Load tax rates for this product
+    List<double> taxRates = [];
+    if (product.taxRateIds.isNotEmpty) {
+      for (final taxRateId in product.taxRateIds) {
+        final taxRate = await _taxRateRepository.getTaxRateById(taxRateId);
+        if (taxRate != null) {
+          taxRates.add(taxRate.rate);
+        }
+      }
+    }
+
     final existingIndex = state.cartItems.indexWhere(
       (item) => item.product.id == product.id,
     );
@@ -109,7 +123,11 @@ class PosNotifier extends StateNotifier<PosState> {
       state = state.copyWith(cartItems: updatedItems);
     } else {
       state = state.copyWith(
-        cartItems: [...state.cartItems, CartItem(product: product, quantity: quantity)],
+        cartItems: [...state.cartItems, CartItem(
+          product: product, 
+          quantity: quantity,
+          taxRates: taxRates,
+        )],
       );
     }
   }
@@ -120,7 +138,7 @@ class PosNotifier extends StateNotifier<PosState> {
     );
   }
 
-  void toggleProductInCart(Product product) {
+  Future<void> toggleProductInCart(Product product) async {
     final existingIndex = state.cartItems.indexWhere(
       (item) => item.product.id == product.id,
     );
@@ -130,7 +148,7 @@ class PosNotifier extends StateNotifier<PosState> {
       removeFromCart(product.id!);
     } else {
       // Product is not in cart, add it with quantity 1
-      addToCart(product, quantity: 1);
+      await addToCart(product, quantity: 1);
     }
   }
 
@@ -175,9 +193,6 @@ class PosNotifier extends StateNotifier<PosState> {
     );
   }
 
-  void setTaxRate(double rate) {
-    state = state.copyWith(taxRate: rate);
-  }
 
   void setPaymentMethod(String method) {
     state = state.copyWith(paymentMethod: method);
@@ -189,7 +204,6 @@ class PosNotifier extends StateNotifier<PosState> {
 
   void clearCart() {
     state = PosState(
-      taxRate: state.taxRate,
       paymentMethod: state.paymentMethod,
       discountType: DiscountType.none,
       discountValue: 0.0,
@@ -209,6 +223,7 @@ class PosNotifier extends StateNotifier<PosState> {
           unitPrice: cartItem.unitPrice,
           quantity: cartItem.quantity,
           discount: cartItem.discount,
+          taxAmount: cartItem.totalTaxAmount,
           total: cartItem.total,
           createdAt: DateTime.now(),
         );
@@ -304,6 +319,7 @@ final posProvider = StateNotifierProvider<PosNotifier, PosState>((ref) {
   final saleRepo = ref.watch(saleRepositoryProvider);
   final inventoryRepo = ref.watch(inventoryRepositoryProvider);
   final customerRepo = ref.watch(customerRepositoryProvider);
-  return PosNotifier(productRepo, saleRepo, inventoryRepo, customerRepo);
+  final taxRateRepo = ref.watch(taxRateRepositoryProvider);
+  return PosNotifier(productRepo, saleRepo, inventoryRepo, customerRepo, taxRateRepo);
 });
 

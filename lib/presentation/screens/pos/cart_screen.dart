@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/customer_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../../domain/entities/customer.dart';
+import '../../../core/constants.dart';
 import '../../widgets/discount_dialog.dart';
 import '../../widgets/quick_customer_dialog.dart';
 import 'cart_item_widget.dart';
@@ -280,6 +281,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         },
                       ),
                       _buildTotalRow('Subtotal', posState.subtotal),
+                      if (posState.taxAmount > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: _buildTotalRow('Tax', posState.taxAmount),
+                        ),
                       if (posState.discountAmount > 0)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
@@ -401,6 +407,75 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+                // Payment Method Selection
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.payment, size: 18, color: Colors.grey.shade700),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Payment Method',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: AppConstants.paymentMethods.map((method) {
+                            final isSelected = posState.paymentMethod == method;
+                            return InkWell(
+                              onTap: () {
+                                ref.read(posProvider.notifier).setPaymentMethod(method);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected 
+                                      ? Theme.of(context).colorScheme.primary 
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isSelected 
+                                        ? Theme.of(context).colorScheme.primary 
+                                        : Colors.grey.shade300,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  AppConstants.getPaymentMethodName(method),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    color: isSelected 
+                                        ? Colors.white 
+                                        : Colors.grey.shade700,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 // Checkout Button

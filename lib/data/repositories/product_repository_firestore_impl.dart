@@ -74,6 +74,8 @@ class ProductRepositoryFirestoreImpl implements ProductRepository {
       'unit': product.unit,
       'description': product.description,
       'isActive': product.isActive,
+      'taxRateIds': product.taxRateIds,
+      'priceIncludesTax': product.priceIncludesTax,
       'createdAt': Timestamp.fromDate(product.createdAt),
       'updatedAt': Timestamp.fromDate(now),
     });
@@ -97,6 +99,8 @@ class ProductRepositoryFirestoreImpl implements ProductRepository {
       'unit': product.unit,
       'description': product.description,
       'isActive': product.isActive,
+      'taxRateIds': product.taxRateIds,
+      'priceIncludesTax': product.priceIncludesTax,
       'updatedAt': Timestamp.fromDate(DateTime.now()),
     });
 
@@ -172,6 +176,15 @@ class ProductRepositoryFirestoreImpl implements ProductRepository {
 
   domain.Product _toProduct(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    // Handle taxRateIds - can be List<int> or List<dynamic>
+    List<int> taxRateIds = [];
+    if (data['taxRateIds'] != null) {
+      final taxIds = data['taxRateIds'];
+      if (taxIds is List) {
+        taxRateIds = taxIds.map((e) => (e as num).toInt()).toList();
+      }
+    }
+    
     return domain.Product(
       id: docIdToId(doc.id),
       name: data['name'] as String,
@@ -185,6 +198,8 @@ class ProductRepositoryFirestoreImpl implements ProductRepository {
       unit: data['unit'] as String? ?? 'pcs',
       description: data['description'] as String?,
       isActive: data['isActive'] as bool? ?? true,
+      taxRateIds: taxRateIds,
+      priceIncludesTax: data['priceIncludesTax'] as bool? ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -217,6 +232,8 @@ extension ProductCopyWith on domain.Product {
     String? unit,
     String? description,
     bool? isActive,
+    List<int>? taxRateIds,
+    bool? priceIncludesTax,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -233,6 +250,8 @@ extension ProductCopyWith on domain.Product {
       unit: unit ?? this.unit,
       description: description ?? this.description,
       isActive: isActive ?? this.isActive,
+      taxRateIds: taxRateIds ?? this.taxRateIds,
+      priceIncludesTax: priceIncludesTax ?? this.priceIncludesTax,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
