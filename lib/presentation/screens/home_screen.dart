@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:math' as math;
 import '../providers/auth_provider.dart';
 import 'pos/pos_screen.dart';
 import 'products/products_screen.dart';
@@ -27,34 +28,169 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Aronium POS'),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.point_of_sale,
+                color: Colors.white,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Text(
+              'Aronium POS',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                letterSpacing: 0.5,
+                foreground: Paint()
+                  ..shader = LinearGradient(
+                    colors: [
+                      Theme.of(context).colorScheme.primary,
+                      Theme.of(context).colorScheme.tertiary,
+                    ],
+                  ).createShader(const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0)),
+              ),
+            ),
+          ],
+        ),
+        elevation: 0,
+        scrolledUnderElevation: 2,
+        shadowColor: Colors.black.withOpacity(0.15),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        foregroundColor: Colors.grey.shade900,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ref.read(authProvider.notifier).logout();
-              if (context.mounted) {
-                Navigator.of(context).pushReplacementNamed('/login');
-              }
-            },
-            tooltip: 'Logout',
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: Colors.red.shade100,
+                width: 1,
+              ),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.logout_rounded,
+                color: Colors.red.shade700,
+                size: 22,
+              ),
+              onPressed: () async {
+                await ref.read(authProvider.notifier).logout();
+                if (context.mounted) {
+                  Navigator.of(context).pushReplacementNamed('/login');
+                }
+              },
+              tooltip: 'Logout',
+              style: IconButton.styleFrom(
+                padding: const EdgeInsets.all(12),
+              ),
+            ),
           ),
         ],
       ),
       drawer: Drawer(
+        elevation: 2,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            topRight: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+        ),
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            UserAccountsDrawerHeader(
-              accountName: Text(user.fullName ?? user.username),
-              accountEmail: Text(user.role.toUpperCase()),
-              currentAccountPicture: CircleAvatar(
-                child: Text(user.username[0].toUpperCase()),
+            DrawerHeader(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.tertiary,
+                  ],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 32,
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      user.username[0].toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    user.fullName ?? user.username,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      user.role.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.shopping_cart),
-              title: const Text('POS'),
+              leading: Icon(
+                Icons.shopping_cart_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: const Text(
+                'POS',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -62,11 +198,26 @@ class HomeScreen extends ConsumerWidget {
                   MaterialPageRoute(builder: (_) => const PosScreen()),
                 );
               },
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 4,
+              ),
             ),
             if (user.isAdmin || user.isManager) ...[
               ListTile(
-                leading: const Icon(Icons.inventory_2),
-                title: const Text('Products'),
+                leading: Icon(
+                  Icons.inventory_2_rounded,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+                title: const Text(
+                  'Products',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -74,10 +225,25 @@ class HomeScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const ProductsScreen()),
                   );
                 },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 4,
+                ),
               ),
               ListTile(
-                leading: const Icon(Icons.receipt_long),
-                title: const Text('Sales'),
+                leading: Icon(
+                  Icons.receipt_long_rounded,
+                  color: Colors.orange.shade700,
+                ),
+                title: const Text(
+                  'Sales',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -85,10 +251,25 @@ class HomeScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const SalesScreen()),
                   );
                 },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 4,
+                ),
               ),
               ListTile(
-                leading: const Icon(Icons.warehouse),
-                title: const Text('Inventory'),
+                leading: Icon(
+                  Icons.warehouse_rounded,
+                  color: Colors.purple.shade600,
+                ),
+                title: const Text(
+                  'Inventory',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -96,10 +277,25 @@ class HomeScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const InventoryScreen()),
                   );
                 },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 4,
+                ),
               ),
               ListTile(
-                leading: const Icon(Icons.people),
-                title: const Text('Customers'),
+                leading: Icon(
+                  Icons.people_rounded,
+                  color: Colors.teal.shade600,
+                ),
+                title: const Text(
+                  'Customers',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -107,10 +303,25 @@ class HomeScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const CustomersScreen()),
                   );
                 },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 4,
+                ),
               ),
               ListTile(
-                leading: const Icon(Icons.assessment),
-                title: const Text('Reports'),
+                leading: Icon(
+                  Icons.assessment_rounded,
+                  color: Colors.indigo.shade600,
+                ),
+                title: const Text(
+                  'Reports',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -118,11 +329,26 @@ class HomeScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const ReportsScreen()),
                   );
                 },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 4,
+                ),
               ),
             ],
             ListTile(
-              leading: const Icon(Icons.money),
-              title: const Text('Cash Session'),
+              leading: Icon(
+                Icons.account_balance_wallet_rounded,
+                color: Colors.amber.shade700,
+              ),
+              title: const Text(
+                'Cash Session',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -130,12 +356,30 @@ class HomeScreen extends ConsumerWidget {
                   MaterialPageRoute(builder: (_) => const CashSessionScreen()),
                 );
               },
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 4,
+              ),
             ),
             if (user.isAdmin) ...[
-              const Divider(),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Divider(),
+              ),
               ListTile(
-                leading: const Icon(Icons.settings),
-                title: const Text('Settings'),
+                leading: Icon(
+                  Icons.settings_rounded,
+                  color: Colors.grey.shade700,
+                ),
+                title: const Text(
+                  'Settings',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -143,17 +387,32 @@ class HomeScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const SettingsScreen()),
                   );
                 },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 4,
+                ),
               ),
             ],
           ],
         ),
       ),
-      body: GridView.count(
-        crossAxisCount: 2,
-        padding: const EdgeInsets.all(16),
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWeb = constraints.maxWidth > 900;
+          final crossAxisCount = isWeb ? 4 : 2;
+          final padding = isWeb ? 32.0 : 16.0;
+          final spacing = isWeb ? 24.0 : 16.0;
+          
+          return GridView.count(
+            crossAxisCount: crossAxisCount,
+            padding: EdgeInsets.all(padding),
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+            childAspectRatio: isWeb ? 1.1 : 1.0,
+            children: [
           _buildMenuCard(
             context,
             'POS',
@@ -226,7 +485,9 @@ class HomeScreen extends ConsumerWidget {
               MaterialPageRoute(builder: (_) => const CashSessionScreen()),
             ),
           ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -238,51 +499,157 @@ class HomeScreen extends ConsumerWidget {
     Color color,
     VoidCallback onTap,
   ) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                color.withOpacity(0.1),
-                color.withOpacity(0.05),
-              ],
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 48, color: color),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return _AnimatedMenuCard(
+      title: title,
+      icon: icon,
+      color: color,
+      onTap: onTap,
     );
   }
 }
 
+// Animated menu card with hover effect
+class _AnimatedMenuCard extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  
+  const _AnimatedMenuCard({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+  
+  @override
+  _AnimatedMenuCardState createState() => _AnimatedMenuCardState();
+}
+
+class _AnimatedMenuCardState extends State<_AnimatedMenuCard> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _rotateAnimation;
+  bool _isHovered = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutQuad),
+    );
+    
+    _rotateAnimation = Tween<double>(begin: 0, end: 0.02).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutQuad),
+    );
+  }
+  
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          _isHovered = true;
+        });
+        _controller.forward();
+      },
+      onExit: (_) {
+        setState(() {
+          _isHovered = false;
+        });
+        _controller.reverse();
+      },
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: Transform.rotate(
+              angle: _rotateAnimation.value * math.pi,
+              child: Card(
+                elevation: _isHovered ? 8 : 4,
+                shadowColor: widget.color.withOpacity(_isHovered ? 0.3 : 0.2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: InkWell(
+                  onTap: widget.onTap,
+                  borderRadius: BorderRadius.circular(24),
+                  splashColor: widget.color.withOpacity(0.1),
+                  highlightColor: widget.color.withOpacity(0.05),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white,
+                          widget.color.withOpacity(0.05),
+                          widget.color.withOpacity(_isHovered ? 0.15 : 0.1),
+                        ],
+                        stops: const [0.0, 0.6, 1.0],
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          padding: EdgeInsets.all(_isHovered ? 24 : 22),
+                          decoration: BoxDecoration(
+                            color: widget.color.withOpacity(_isHovered ? 0.2 : 0.15),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: widget.color.withOpacity(_isHovered ? 0.3 : 0.2),
+                                blurRadius: _isHovered ? 20 : 15,
+                                spreadRadius: _isHovered ? 3 : 2,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.8),
+                              width: 4,
+                            ),
+                          ),
+                          child: Icon(
+                            widget.icon,
+                            size: _isHovered ? 54 : 50,
+                            color: widget.color,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 200),
+                          style: TextStyle(
+                            fontSize: _isHovered ? 20 : 18,
+                            fontWeight: FontWeight.w600,
+                            color: widget.color.withBlue(widget.color.blue - 10).withRed(widget.color.red - 10),
+                            letterSpacing: 0.5,
+                          ),
+                          child: Text(widget.title),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}

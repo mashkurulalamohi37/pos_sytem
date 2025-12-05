@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class BarcodeScannerWidget extends StatefulWidget {
@@ -14,18 +15,27 @@ class BarcodeScannerWidget extends StatefulWidget {
 }
 
 class _BarcodeScannerWidgetState extends State<BarcodeScannerWidget> {
-  final MobileScannerController _controller = MobileScannerController(
-    detectionSpeed: DetectionSpeed.noDuplicates,
-    facing: CameraFacing.back,
-    torchEnabled: false,
-  );
-
+  MobileScannerController? _controller;
+  final TextEditingController _barcodeController = TextEditingController();
   bool _isScanning = true;
   String? _lastScannedCode;
 
   @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb) {
+      _controller = MobileScannerController(
+        detectionSpeed: DetectionSpeed.noDuplicates,
+        facing: CameraFacing.back,
+        torchEnabled: false,
+      );
+    }
+  }
+
+  @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
+    _barcodeController.dispose();
     super.dispose();
   }
 
@@ -57,8 +67,66 @@ class _BarcodeScannerWidgetState extends State<BarcodeScannerWidget> {
     });
   }
 
+  void _handleManualBarcode() {
+    final barcode = _barcodeController.text.trim();
+    if (barcode.isNotEmpty) {
+      widget.onBarcodeScanned(barcode);
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Web version: Show manual input
+    if (kIsWeb) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Enter Barcode'),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.qr_code_scanner,
+                size: 80,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 32),
+              TextField(
+                controller: _barcodeController,
+                decoration: InputDecoration(
+                  labelText: 'Barcode',
+                  hintText: 'Enter or paste barcode',
+                  prefixIcon: const Icon(Icons.qr_code),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                ),
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _handleManualBarcode(),
+                autofocus: true,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _handleManualBarcode,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Search Product'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Mobile version: Show camera scanner
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -67,16 +135,16 @@ class _BarcodeScannerWidgetState extends State<BarcodeScannerWidget> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: Icon(_controller.torchEnabled ? Icons.flash_on : Icons.flash_off),
+            icon: Icon(_controller!.torchEnabled ? Icons.flash_on : Icons.flash_off),
             onPressed: () {
-              _controller.toggleTorch();
+              _controller!.toggleTorch();
             },
             tooltip: 'Toggle Flash',
           ),
           IconButton(
             icon: const Icon(Icons.flip_camera_android),
             onPressed: () {
-              _controller.switchCamera();
+              _controller!.switchCamera();
             },
             tooltip: 'Switch Camera',
           ),
@@ -85,7 +153,7 @@ class _BarcodeScannerWidgetState extends State<BarcodeScannerWidget> {
       body: Stack(
         children: [
           MobileScanner(
-            controller: _controller,
+            controller: _controller!,
             onDetect: _handleBarcode,
             errorBuilder: (context, error, child) {
               return Center(

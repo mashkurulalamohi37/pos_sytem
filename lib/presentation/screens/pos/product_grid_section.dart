@@ -58,15 +58,24 @@ class ProductGridSection extends StatelessWidget {
     // Filter out inactive products for POS
     final activeProducts = products.where((p) => p.isActive).toList();
     
+    // Responsive grid based on screen size
+    final crossAxisCount = MediaQuery.of(context).size.width > 1200 ? 6 : 
+                          MediaQuery.of(context).size.width > 900 ? 5 : 
+                          MediaQuery.of(context).size.width > 600 ? 4 : 3;
+    
     return GridView.builder(
-      padding: const EdgeInsets.all(8),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 0.65,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
+      padding: const EdgeInsets.all(12),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: 0.62, // Further reduced to prevent overflow
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
       ),
       itemCount: activeProducts.length,
+      // Performance: Optimize grid rendering
+      cacheExtent: 500,
+      addAutomaticKeepAlives: false,
+      addRepaintBoundaries: true,
       itemBuilder: (context, index) {
         final product = activeProducts[index];
         final isOutOfStock = product.stockQuantity <= 0;
@@ -81,40 +90,58 @@ class ProductGridSection extends StatelessWidget {
         final cartQuantity = cartItem.quantity;
         
         return Card(
-          elevation: isInCart ? 4 : 2,
+          elevation: isInCart ? 6 : 2,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             side: isInCart
                 ? BorderSide(
                     color: Theme.of(context).colorScheme.primary,
-                    width: 2,
+                    width: 2.5,
                   )
-                : BorderSide.none,
+                : BorderSide(color: Colors.grey.shade200, width: 1),
           ),
           child: InkWell(
             onTap: isOutOfStock ? null : () => onProductTap(product),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             child: Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: isOutOfStock
-                    ? Colors.grey.shade100
+                borderRadius: BorderRadius.circular(16),
+                gradient: isOutOfStock
+                    ? null
                     : isInCart
-                        ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.1)
-                        : Colors.white,
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Theme.of(context).colorScheme.primaryContainer.withOpacity(0.15),
+                              Theme.of(context).colorScheme.primaryContainer.withOpacity(0.05),
+                            ],
+                          )
+                        : LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white,
+                              Colors.grey.shade50,
+                            ],
+                          ),
+                color: isOutOfStock ? Colors.grey.shade100 : null,
               ),
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
+                    // Icon section with fixed height - reduced
+                    SizedBox(
+                      height: 65,
                       child: Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           Center(
                             child: Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: isOutOfStock
                                     ? Colors.grey.shade200
@@ -122,10 +149,22 @@ class ProductGridSection extends StatelessWidget {
                                         ? Colors.orange.shade50
                                         : Theme.of(context).colorScheme.primaryContainer,
                                 borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (isOutOfStock
+                                            ? Colors.grey.shade300
+                                            : isLowStock
+                                                ? Colors.orange.shade200
+                                                : Theme.of(context).colorScheme.primary.withOpacity(0.2))
+                                        .withOpacity(0.2),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
                               child: Icon(
                                 Icons.inventory_2,
-                                size: 32,
+                                size: 28,
                                 color: isOutOfStock
                                     ? Colors.grey.shade400
                                     : isLowStock
@@ -140,19 +179,19 @@ class ProductGridSection extends StatelessWidget {
                               top: -2,
                               right: -2,
                               child: Container(
-                                padding: const EdgeInsets.all(4),
+                                padding: const EdgeInsets.all(2.5),
                                 decoration: BoxDecoration(
                                   color: Theme.of(context).colorScheme.primary,
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: Colors.white,
-                                    width: 2,
+                                    width: 1.5,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
+                                      color: Colors.black.withOpacity(0.15),
+                                      blurRadius: 2,
+                                      offset: const Offset(0, 1),
                                     ),
                                   ],
                                 ),
@@ -160,7 +199,7 @@ class ProductGridSection extends StatelessWidget {
                                   '$cartQuantity',
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 10,
+                                    fontSize: 8,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -170,56 +209,80 @@ class ProductGridSection extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      product.name,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
-                        color: isOutOfStock ? Colors.grey.shade600 : Colors.black87,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'TK ${product.sellingPrice.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: isOutOfStock
-                            ? Colors.grey.shade500
-                            : Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                    // Product name - constrained height
+                    SizedBox(
+                      height: 28,
+                      child: Center(
+                        child: Text(
+                          product.name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: isOutOfStock ? Colors.grey.shade600 : Colors.black87,
+                            height: 1.1,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 3),
-                    // Stock quantity - always visible
+                    // Price - fixed height
                     Container(
-                      width: double.infinity,
+                      height: 20,
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isOutOfStock
+                            ? Colors.grey.shade200
+                            : Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'TK ${product.sellingPrice.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: isOutOfStock
+                                ? Colors.grey.shade600
+                                : Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    // Stock quantity - fixed height
+                    Container(
+                      height: 16,
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
                       decoration: BoxDecoration(
                         color: isOutOfStock
                             ? Colors.red.shade50
                             : isLowStock
                                 ? Colors.orange.shade50
                                 : Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(3),
                       ),
-                      child: Text(
-                        isOutOfStock
-                            ? 'Out'
-                            : 'Stock: ${product.stockQuantity}',
-                        style: TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.w600,
-                          color: isOutOfStock
-                              ? Colors.red.shade700
-                              : isLowStock
-                                  ? Colors.orange.shade700
-                                  : Colors.green.shade700,
+                      child: Center(
+                        child: Text(
+                          isOutOfStock
+                              ? 'Out'
+                              : 'Stock: ${product.stockQuantity}',
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w600,
+                            color: isOutOfStock
+                                ? Colors.red.shade700
+                                : isLowStock
+                                    ? Colors.orange.shade700
+                                    : Colors.green.shade700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

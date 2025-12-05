@@ -1,541 +1,228 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/pos_provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/customer_provider.dart';
-import '../../providers/product_provider.dart';
-import '../../../domain/entities/customer.dart';
-import '../../../core/constants.dart';
-import '../../widgets/discount_dialog.dart';
-import '../../widgets/quick_customer_dialog.dart';
-import 'cart_item_widget.dart';
 
-class CartScreen extends ConsumerStatefulWidget {
+class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
 
   @override
-  ConsumerState<CartScreen> createState() => _CartScreenState();
-}
-
-class _CartScreenState extends ConsumerState<CartScreen> {
-  @override
   Widget build(BuildContext context) {
-    final posState = ref.watch(posProvider);
-    final authState = ref.watch(authProvider);
-    final customersState = ref.watch(customerProvider);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cart'),
-        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: Column(
         children: [
           // Cart Items List
           Expanded(
-            child: posState.cartItems.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.shopping_cart_outlined,
-                          size: 64,
-                          color: Colors.grey.shade300,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Cart is empty',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Add products from the POS screen',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: posState.cartItems.length,
-                    itemBuilder: (context, index) {
-                      final item = posState.cartItems[index];
-                      return CartItemWidget(
-                        item: item,
-                        onQuantityChanged: (productId, quantity) {
-                          ref.read(posProvider.notifier).updateQuantity(productId, quantity);
-                        },
-                        onRemove: (productId) {
-                          ref.read(posProvider.notifier).removeFromCart(productId);
-                        },
-                        onDiscountChanged: (productId, discount) {
-                          ref.read(posProvider.notifier).updateDiscount(productId, discount);
-                        },
-                      );
-                    },
-                  ),
-          ),
-          // Totals and Checkout Section
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                top: BorderSide(color: Colors.grey.shade300, width: 1),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              children: const [
+                CartItemWidget(
+                  name: 'Ohi',
+                  price: 500.00,
+                  quantity: 1,
+                ),
+                CartItemWidget(
+                  name: 'Biscuit',
+                  price: 60.00,
+                  quantity: 1,
+                ),
+                CartItemWidget(
+                  name: 'Water',
+                  price: 10.00,
+                  quantity: 1,
+                ),
+                CartItemWidget(
+                  name: 'Mojo',
+                  price: 20.00,
+                  quantity: 1,
+                ),
+                CartItemWidget(
+                  name: 'Noodles',
+                  price: 60.00,
+                  quantity: 1,
+                ),
+                CartItemWidget(
+                  name: 'Rice',
+                  price: 1550.00,
+                  quantity: 1,
                 ),
               ],
             ),
+          ),
+          
+          // Bottom Section
+          Container(
+            color: Colors.white,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Customer Selection
-                Padding(
-                  padding: const EdgeInsets.all(12),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.person_outline,
-                        size: 20,
-                        color: Colors.grey.shade700,
-                      ),
-                      const SizedBox(width: 8),
                       Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade300, width: 1),
-                          ),
-                          child: DropdownButton<Customer?>(
-                            value: posState.selectedCustomerId != null
-                                ? (() {
-                                    try {
-                                      return customersState.customers.firstWhere(
-                                        (c) => c.id != null && c.id.toString() == posState.selectedCustomerId,
-                                      );
-                                    } catch (e) {
-                                      return null;
-                                    }
-                                  })()
-                                : null,
-                            isExpanded: true,
-                            underline: const SizedBox(),
-                            hint: Text(
-                              'Walk-in Customer',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                            items: [
-                              const DropdownMenuItem<Customer?>(
-                                value: null,
-                                child: Text(
-                                  'Walk-in Customer',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
-                              ...customersState.customers.map((customer) {
-                                return DropdownMenuItem<Customer?>(
-                                  value: customer,
-                                  child: Text(
-                                    customer.name,
-                                    style: const TextStyle(fontSize: 14),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                );
-                              }),
-                            ],
-                            onChanged: (customer) {
-                              ref.read(posProvider.notifier).setCustomer(
-                                customer?.id != null ? customer!.id.toString() : null,
-                              );
-                            },
-                            selectedItemBuilder: (BuildContext context) {
-                              return [
-                                const Text(
-                                  'Walk-in Customer',
-                                  style: TextStyle(fontSize: 14, color: Colors.black87),
-                                ),
-                                ...customersState.customers.map((customer) {
-                                  return Text(
-                                    customer.name,
-                                    style: const TextStyle(fontSize: 14, color: Colors.black87),
-                                    overflow: TextOverflow.ellipsis,
-                                  );
-                                }),
-                              ];
-                            },
-                            style: const TextStyle(fontSize: 14, color: Colors.black87),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: Icon(
-                          Icons.add_circle_outline,
-                          size: 24,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        onPressed: () async {
-                          final newCustomer = await showDialog<Customer>(
-                            context: context,
-                            builder: (context) => const QuickCustomerDialog(),
-                          );
-                          if (newCustomer != null) {
-                            ref.read(posProvider.notifier).setCustomer(
-                              newCustomer.id != null ? newCustomer.id.toString() : null,
-                            );
-                            // Refresh customer list
-                            ref.read(customerProvider.notifier).loadCustomers();
-                          }
-                        },
-                        tooltip: 'Add New Customer',
-                      ),
-                    ],
-                  ),
-                ),
-                // Totals
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Calculate individual item discounts total
-                      Builder(
-                        builder: (context) {
-                          final individualDiscountsTotal = posState.cartItems.fold(
-                            0.0,
-                            (sum, item) => sum + item.discount,
-                          );
-                          final subtotalBeforeDiscounts = posState.cartItems.fold(
-                            0.0,
-                            (sum, item) => sum + (item.unitPrice * item.quantity),
-                          );
-                          if (individualDiscountsTotal > 0) {
-                            return Column(
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Subtotal (before discounts)',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.grey.shade700,
-                                        ),
-                                      ),
-                                      Text(
-                                        'TK ${subtotalBeforeDiscounts.toStringAsFixed(2)}',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.grey.shade700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Item Discounts',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.grey.shade700,
-                                        ),
-                                      ),
-                                      Text(
-                                        '-TK ${individualDiscountsTotal.toStringAsFixed(2)}',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.red.shade700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                        child: DropdownButtonHideUnderline(
+                          child: ButtonTheme(
+                            alignedDropdown: true,
+                            child: DropdownButton<String>(
+                              value: null,
+                              isExpanded: true,
+                              icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                              hint: const Text('Walk-in Customer'),
+                              items: const [
+                                DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('Walk-in Customer'),
                                 ),
                               ],
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
+                              onChanged: (value) {},
+                            ),
+                          ),
+                        ),
                       ),
-                      _buildTotalRow('Subtotal', posState.subtotal),
-                      if (posState.taxAmount > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: _buildTotalRow('Tax', posState.taxAmount),
-                        ),
-                      if (posState.discountAmount > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    'Discount',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade700,
-                                    ),
-                                  ),
-                                  if (posState.discountType == DiscountType.percentage)
-                                    Text(
-                                      ' (${posState.discountValue.toStringAsFixed(1)}%)',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '-TK ${posState.discountAmount.toStringAsFixed(2)}',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.red.shade700,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.edit,
-                                      size: 18,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                    onPressed: () async {
-                                      final result = await showDialog<Map<String, dynamic>>(
-                                        context: context,
-                                        builder: (context) => DiscountDialog(
-                                          currentType: posState.discountType,
-                                          currentValue: posState.discountValue,
-                                        ),
-                                      );
-                                      if (result != null) {
-                                        final type = result['type'];
-                                        final value = result['value'];
-                                        if (type != null && type is DiscountType) {
-                                          ref.read(posProvider.notifier).setDiscount(
-                                            type,
-                                            (value as num?)?.toDouble() ?? 0.0,
-                                          );
-                                        }
-                                      }
-                                    },
-                                    tooltip: 'Edit Discount',
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  Icons.add,
-                                  size: 18,
-                                  color: Colors.grey.shade600,
-                                ),
-                                onPressed: () async {
-                                  final result = await showDialog<Map<String, dynamic>>(
-                                    context: context,
-                                    builder: (context) => DiscountDialog(
-                                      currentType: posState.discountType,
-                                      currentValue: posState.discountValue,
-                                    ),
-                                  );
-                                  if (result != null) {
-                                    final type = result['type'];
-                                    final value = result['value'];
-                                    if (type != null && type is DiscountType) {
-                                      ref.read(posProvider.notifier).setDiscount(
-                                        type,
-                                        (value as num?)?.toDouble() ?? 0.0,
-                                      );
-                                    }
-                                  }
-                                },
-                                tooltip: 'Add Discount',
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (posState.taxAmount > 0) _buildTotalRow('Tax', posState.taxAmount),
-                      const Divider(height: 16, thickness: 1),
-                      // Total Row
                       Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(50),
                         ),
-                        child: _buildTotalRow(
-                          'Total',
-                          posState.totalAmount,
-                          isTotal: true,
+                        margin: const EdgeInsets.only(right: 8),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.add,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          onPressed: () {},
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(4),
                         ),
                       ),
                     ],
                   ),
                 ),
-                // Payment Method Selection
+                
+                // Subtotal
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.payment, size: 18, color: Colors.grey.shade700),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Payment Method',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                          ],
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: const [
+                      Text(
+                        'Subtotal',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      Text(
+                        'TK 2200.00',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
                         ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: AppConstants.paymentMethods.map((method) {
-                            final isSelected = posState.paymentMethod == method;
-                            return InkWell(
-                              onTap: () {
-                                ref.read(posProvider.notifier).setPaymentMethod(method);
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected 
-                                      ? Theme.of(context).colorScheme.primary 
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: isSelected 
-                                        ? Theme.of(context).colorScheme.primary 
-                                        : Colors.grey.shade300,
-                                    width: isSelected ? 2 : 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  AppConstants.getPaymentMethodName(method),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                    color: isSelected 
-                                        ? Colors.white 
-                                        : Colors.grey.shade700,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-                // Checkout Button
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: posState.cartItems.isEmpty ? null : () async {
-                        final user = authState.user;
-                        if (user == null) return;
-
-                        final success = await ref.read(posProvider.notifier).processPayment(
-                              user.id!,
-                              1,
-                            );
-
-                        if (success && mounted) {
-                          // Refresh products to show updated stock
-                          ref.read(productProvider.notifier).loadProducts();
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Sale completed successfully!'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        } else if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Failed to process sale'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: Colors.green.shade600,
-                        foregroundColor: Colors.white,
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                
+                // Total
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  margin: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Total',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
-                        disabledBackgroundColor: Colors.grey.shade300,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.payment, size: 20),
-                          SizedBox(width: 8),
+                      Text(
+                        'TK 2200.00',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Payment Method
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.payment, size: 14),
+                          const SizedBox(width: 4),
                           Text(
-                            'Checkout',
+                            'Payment Method',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _buildPaymentMethodButton('Cash', true),
+                          _buildPaymentMethodButton('Card', false),
+                          _buildPaymentMethodButton('bKash', false),
+                          _buildPaymentMethodButton('Nagad', false),
+                          _buildPaymentMethodButton('Rocket', false),
+                          _buildPaymentMethodButton('Advance', false),
+                          _buildPaymentMethodButton('Due', false),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Checkout Button
+                Container(
+                  width: double.infinity,
+                  height: 50,
+                  margin: const EdgeInsets.only(top: 8),
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.payment),
+                    label: const Text(
+                      'Checkout',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.zero,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
@@ -546,27 +233,211 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ),
     );
   }
+  
+  Widget _buildPaymentMethodButton(String label, bool isSelected) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.blue : Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: isSelected ? Colors.blue : Colors.grey.shade300,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected ? Colors.white : Colors.grey.shade700,
+        ),
+      ),
+    );
+  }
+}
 
-  Widget _buildTotalRow(String label, double amount, {bool isTotal = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+class CartItemWidget extends StatelessWidget {
+  final String name;
+  final double price;
+  final int quantity;
+
+  const CartItemWidget({
+    super.key,
+    required this.name,
+    required this.price,
+    required this.quantity,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F2FF),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: isTotal ? 16 : 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
-              color: isTotal ? Colors.black87 : Colors.grey.shade700,
+          // Left section with icon and product info
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                children: [
+                  // Product Icon
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Icon(
+                      Icons.inventory_2,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  
+                  // Product Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Text(
+                              'TK ${price.toStringAsFixed(2)} × $quantity',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Add discount',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          Text(
-            'TK ${amount.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontSize: isTotal ? 18 : 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
-              color: isTotal ? Colors.green.shade700 : Colors.black87,
+          
+          // Price display
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: Text(
+              'TK ${(price * quantity).toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Colors.blue,
+              ),
+            ),
+          ),
+          
+          // Quantity Controls
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Center(
+                  child: Icon(Icons.remove, size: 12),
+                ),
+              ),
+              SizedBox(
+                width: 20,
+                child: Center(
+                  child: Text(
+                    '$quantity',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Center(
+                  child: Icon(Icons.add, size: 12),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.delete_outline,
+                color: Colors.red,
+                size: 16,
+              ),
+              const SizedBox(width: 2),
+            ],
+          ),
+          
+          // Yellow/Black Warning Stripes
+          Container(
+            width: 20,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [
+                  Colors.yellow,
+                  Colors.black,
+                  Colors.yellow,
+                  Colors.black,
+                  Colors.yellow,
+                ],
+                stops: [0.0, 0.25, 0.5, 0.75, 1.0],
+              ),
+              borderRadius: BorderRadius.only(
+                topRight: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+            ),
+            child: Center(
+              child: RotatedBox(
+                quarterTurns: 3,
+                child: const Text(
+                  '',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -574,4 +445,3 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 }
-

@@ -133,6 +133,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     : ListView.builder(
                         padding: const EdgeInsets.all(12),
                         itemCount: filteredCustomers.length,
+                        // Performance: Optimize list rendering
+                        cacheExtent: 500,
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
                         itemBuilder: (context, index) {
                           final customer = filteredCustomers[index];
                           return _buildCustomerCard(customer, canEdit);

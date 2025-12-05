@@ -40,12 +40,22 @@ class _TaxRateFormScreenState extends ConsumerState<TaxRateFormScreen> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    print('DEBUG TaxRateForm: Saving tax rate');
+    if (!_formKey.currentState!.validate()) {
+      print('DEBUG TaxRateForm: Form validation failed');
+      return;
+    }
 
-    if (_isLoading) return; // Prevent double submission
+    if (_isLoading) {
+      print('DEBUG TaxRateForm: Already loading, preventing double submission');
+      return;
+    }
 
     final rate = double.tryParse(_rateController.text);
+    print('DEBUG TaxRateForm: Parsed rate: $rate');
+    
     if (rate == null || rate < 0) {
+      print('DEBUG TaxRateForm: Invalid rate value');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter a valid tax rate'),
@@ -58,6 +68,8 @@ class _TaxRateFormScreenState extends ConsumerState<TaxRateFormScreen> {
     setState(() {
       _isLoading = true;
     });
+    
+    print('DEBUG TaxRateForm: Form validated, proceeding to save');
 
     try {
       final now = DateTime.now();

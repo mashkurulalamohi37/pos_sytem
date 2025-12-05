@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'cart_item.dart';
 import '../../widgets/discount_dialog.dart';
 import '../../providers/pos_provider.dart';
+
+// This file is kept for backward compatibility
+// The main implementation is now in cart_screen.dart
 
 class CartItemWidget extends StatelessWidget {
   final CartItem item;
@@ -19,244 +23,305 @@ class CartItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F2FF),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            // Product Icon
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.inventory_2,
-                color: Theme.of(context).colorScheme.primary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Product Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+      child: Row(
+        children: [
+          // Left section with icon and product info
+          Flexible(
+            flex: 3,
+            child: Padding(
+              padding: EdgeInsets.all(kIsWeb ? 6.0 : 8.0),
+              child: Row(
                 children: [
-                  Text(
-                    item.product.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
+                  // Product Icon
+                  Container(
+                    width: kIsWeb ? 28 : 32,
+                    height: kIsWeb ? 28 : 32,
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(4),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'TK ${item.unitPrice.toStringAsFixed(2)} × ${item.quantity}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
+                    child: Icon(
+                      Icons.inventory_2,
+                      color: Colors.white,
+                      size: kIsWeb ? 16 : 18,
                     ),
                   ),
-                  if (item.discount > 0) ...[
-                    const SizedBox(height: 2),
-                    Row(
+                  SizedBox(width: kIsWeb ? 8 : 12),
+                  
+                  // Product Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Flexible(
-                          child: Text(
-                            'Discount: -TK ${item.discount.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.red.shade700,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                        Text(
+                          item.product.name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: kIsWeb ? 13 : 14,
                           ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
-                        const SizedBox(width: 2),
-                        GestureDetector(
-                          onTap: () async {
-                            final result = await showDialog<Map<String, dynamic>>(
-                              context: context,
-                              builder: (context) => DiscountDialog(
-                                currentType: item.discount > 0 ? DiscountType.fixed : DiscountType.none,
-                                currentValue: item.discount,
+                        const SizedBox(height: 2),
+                        // Use Wrap to prevent overflow
+                        Wrap(
+                          spacing: kIsWeb ? 4 : 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'TK ${item.unitPrice.toStringAsFixed(2)} × ${item.quantity}',
+                                style: TextStyle(
+                                  fontSize: kIsWeb ? 10 : 12,
+                                  color: Colors.grey.shade700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            );
-                            if (result != null) {
-                              final type = result['type'];
-                              final value = result['value'];
-                              if (type != null && type is DiscountType) {
-                                if (type == DiscountType.none) {
-                                  onDiscountChanged(item.product.id!, 0.0);
-                                } else if (type == DiscountType.fixed) {
-                                  final discountAmount = (value as num?)?.toDouble() ?? 0.0;
-                                  final maxDiscount = item.unitPrice * item.quantity;
-                                  onDiscountChanged(item.product.id!, discountAmount > maxDiscount ? maxDiscount : discountAmount);
-                                } else if (type == DiscountType.percentage) {
-                                  final percentage = (value as num?)?.toDouble() ?? 0.0;
-                                  final discountAmount = (item.unitPrice * item.quantity) * (percentage / 100);
-                                  onDiscountChanged(item.product.id!, discountAmount);
-                                }
-                              }
-                            }
-                          },
-                          child: Icon(
-                            Icons.edit,
-                            size: 14,
-                            color: Colors.grey.shade600,
-                          ),
+                            ),
+                            GestureDetector(
+                              onTap: () => _showDiscountDialog(context),
+                              child: Text(
+                                'Add discount',
+                                style: TextStyle(
+                                  fontSize: kIsWeb ? 10 : 12,
+                                  color: Colors.blue,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
-                    ),
-                  ] else ...[
-                    const SizedBox(height: 2),
-                    GestureDetector(
-                      onTap: () async {
-                        final result = await showDialog<Map<String, dynamic>>(
-                          context: context,
-                          builder: (context) => DiscountDialog(
-                            currentType: DiscountType.none,
-                            currentValue: 0.0,
-                          ),
-                        );
-                        if (result != null) {
-                          final type = result['type'];
-                          final value = result['value'];
-                          if (type != null && type is DiscountType) {
-                            if (type == DiscountType.fixed) {
-                              final discountAmount = (value as num?)?.toDouble() ?? 0.0;
-                              final maxDiscount = item.unitPrice * item.quantity;
-                              onDiscountChanged(item.product.id!, discountAmount > maxDiscount ? maxDiscount : discountAmount);
-                            } else if (type == DiscountType.percentage) {
-                              final percentage = (value as num?)?.toDouble() ?? 0.0;
-                              final discountAmount = (item.unitPrice * item.quantity) * (percentage / 100);
-                              onDiscountChanged(item.product.id!, discountAmount);
-                            }
-                          }
-                        }
-                      },
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.discount_outlined,
-                            size: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              'Add discount',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey.shade600,
-                                decoration: TextDecoration.underline,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 4),
-                  Text(
-                    'TK ${item.total.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            // Quantity Controls
-            Column(
+          ),
+          
+          // Price display - Flexible for web
+          Flexible(
+            flex: 1,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: kIsWeb ? 2.0 : 4.0),
+              child: Text(
+                'TK ${(item.unitPrice * item.quantity - item.discount).toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: kIsWeb ? 12 : 14,
+                  color: Colors.blue,
+                ),
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+              ),
+            ),
+          ),
+          
+          // Quantity Controls - more compact for web
+          if (!kIsWeb) ...[
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.remove, size: 16),
-                        onPressed: () {
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Center(
+                    child: IconButton(
+                      icon: const Icon(Icons.remove, size: 12),
+                      onPressed: () {
+                        if (item.quantity > 1) {
                           onQuantityChanged(item.product.id!, item.quantity - 1);
-                        },
-                        padding: const EdgeInsets.all(4),
-                        constraints: const BoxConstraints(
-                          minWidth: 28,
-                          minHeight: 28,
-                        ),
-                        color: Colors.grey.shade700,
-                      ),
+                        }
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
-                    Container(
-                      width: 32,
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${item.quantity}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.add, size: 16),
-                        onPressed: () {
-                          onQuantityChanged(item.product.id!, item.quantity + 1);
-                        },
-                        padding: const EdgeInsets.all(4),
-                        constraints: const BoxConstraints(
-                          minWidth: 28,
-                          minHeight: 28,
-                        ),
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 6),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  onPressed: () {
+                SizedBox(
+                  width: 20,
+                  child: Center(
+                    child: Text(
+                      '${item.quantity}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Center(
+                    child: IconButton(
+                      icon: const Icon(Icons.add, size: 12),
+                      onPressed: () {
+                        onQuantityChanged(item.product.id!, item.quantity + 1);
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () {
                     onRemove(item.product.id!);
                   },
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 28,
-                    minHeight: 28,
+                  child: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.red,
+                    size: 16,
                   ),
-                  color: Colors.red.shade400,
+                ),
+                const SizedBox(width: 2),
+              ],
+            ),
+          ] else ...[
+            // Web: More compact controls
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Center(
+                    child: IconButton(
+                      icon: const Icon(Icons.remove, size: 10),
+                      onPressed: () {
+                        if (item.quantity > 1) {
+                          onQuantityChanged(item.product.id!, item.quantity - 1);
+                        }
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 18,
+                  child: Center(
+                    child: Text(
+                      '${item.quantity}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Center(
+                    child: IconButton(
+                      icon: const Icon(Icons.add, size: 10),
+                      onPressed: () {
+                        onQuantityChanged(item.product.id!, item.quantity + 1);
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 2),
+                GestureDetector(
+                  onTap: () {
+                    onRemove(item.product.id!);
+                  },
+                  child: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.red,
+                    size: 14,
+                  ),
                 ),
               ],
             ),
           ],
-        ),
+          
+          // Yellow/Black Warning Stripes
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(12),
+              bottomRight: Radius.circular(12),
+            ),
+            child: Container(
+              width: kIsWeb ? 12 : 15,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.yellow,
+                    Colors.black,
+                    Colors.yellow,
+                    Colors.black,
+                    Colors.yellow,
+                  ],
+                  stops: [0.0, 0.25, 0.5, 0.75, 1.0],
+                  tileMode: TileMode.repeated,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-}
 
+  Future<void> _showDiscountDialog(BuildContext context) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => DiscountDialog(
+        currentType: item.discount > 0 ? DiscountType.fixed : DiscountType.none,
+        currentValue: item.discount,
+      ),
+    );
+    
+    if (result != null) {
+      final type = result['type'];
+      final value = result['value'];
+      
+      if (type != null && type is DiscountType) {
+        if (type == DiscountType.none) {
+          onDiscountChanged(item.product.id!, 0.0);
+        } else if (type == DiscountType.fixed) {
+          final discountAmount = (value as num?)?.toDouble() ?? 0.0;
+          final maxDiscount = item.unitPrice * item.quantity;
+          onDiscountChanged(
+            item.product.id!,
+            discountAmount > maxDiscount ? maxDiscount : discountAmount,
+          );
+        } else if (type == DiscountType.percentage) {
+          final percentage = (value as num?)?.toDouble() ?? 0.0;
+          final discountAmount = (item.unitPrice * item.quantity) * (percentage / 100);
+          onDiscountChanged(item.product.id!, discountAmount);
+        }
+      }
+    }
+  }
+}

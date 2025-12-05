@@ -1,5 +1,7 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
+# Let CMake auto-detect the available Visual Studio version
+# This will work with Visual Studio 2019, 2022, or 2026
 project(aronium LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change

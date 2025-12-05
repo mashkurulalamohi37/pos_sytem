@@ -1,16 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async' show unawaited;
 import '../../domain/entities/product.dart';
 import '../../domain/repositories/product_repository.dart';
 import '../../domain/repositories/sale_repository.dart';
 import '../../domain/repositories/inventory_repository.dart';
 import '../../domain/repositories/customer_repository.dart';
 import '../../domain/repositories/tax_rate_repository.dart';
+import '../../domain/repositories/cash_session_repository.dart';
 import '../../domain/entities/sale.dart';
 import '../../domain/entities/sale_item.dart';
 import '../../domain/entities/stock_movement.dart';
 import '../../core/constants.dart';
 import 'repository_providers.dart';
-import 'auth_provider.dart';
 import '../screens/pos/cart_item.dart';
 
 enum DiscountType {
@@ -89,6 +90,7 @@ class PosNotifier extends StateNotifier<PosState> {
   final InventoryRepository _inventoryRepository;
   final CustomerRepository _customerRepository;
   final TaxRateRepository _taxRateRepository;
+  final CashSessionRepository? _cashSessionRepository;
 
   PosNotifier(
     this._productRepository,
@@ -96,11 +98,13 @@ class PosNotifier extends StateNotifier<PosState> {
     this._inventoryRepository,
     this._customerRepository,
     this._taxRateRepository,
+    this._cashSessionRepository,
   ) : super(PosState());
 
   Future<void> addToCart(Product product, {int quantity = 1}) async {
     // Load tax rates for this product
     List<double> taxRates = [];
+    
     if (product.taxRateIds.isNotEmpty) {
       for (final taxRateId in product.taxRateIds) {
         final taxRate = await _taxRateRepository.getTaxRateById(taxRateId);
@@ -178,6 +182,11 @@ class PosNotifier extends StateNotifier<PosState> {
 
     state = state.copyWith(cartItems: updatedItems);
   }
+  
+  // Method to update all cart items at once
+  void updateCartItems(List<CartItem> items) {
+    state = state.copyWith(cartItems: items);
+  }
 
   void setDiscount(DiscountType type, double value) {
     state = state.copyWith(
@@ -210,11 +219,12 @@ class PosNotifier extends StateNotifier<PosState> {
     );
   }
 
-  Future<bool> processPayment(int userId, int branchId) async {
-    if (state.cartItems.isEmpty) return false;
+  // Optimized and faster payment processing
+  Future<Sale?> processPayment(int userId, int branchId) async {
+    if (state.cartItems.isEmpty) return null;
 
     try {
-      // Create sale items
+      // Create sale items efficiently in one go
       final saleItems = state.cartItems.map((cartItem) {
         return SaleItem(
           saleId: 0, // Will be set after sale creation
@@ -246,70 +256,135 @@ class PosNotifier extends StateNotifier<PosState> {
         createdAt: DateTime.now(),
       );
 
-      await _saleRepository.createSale(sale, saleItems);
-
-      // Update loyalty points if customer is associated
-      if (sale.customerId != null) {
-        try {
-          final customer = await _customerRepository.getCustomerById(sale.customerId!);
-          if (customer != null) {
-            // Calculate loyalty points earned (based on total amount)
-            final pointsEarned = sale.totalAmount * AppConstants.loyaltyPointsRate;
-            final newLoyaltyPoints = customer.loyaltyPoints + pointsEarned;
-            
-            // Update customer's loyalty points
-            await _customerRepository.updateLoyaltyPoints(sale.customerId!, newLoyaltyPoints);
-          }
-        } catch (e) {
-          // If loyalty points update fails, log but don't fail the sale
-          print('Error updating loyalty points: $e');
-        }
-      }
-
-      // Update stock levels
+      // Create sale first - this is the most critical operation
+      final createdSale = await _saleRepository.createSale(sale, saleItems);
+      
+      // Prepare a list of all inventory updates to be done in parallel
+      List<Future> inventoryUpdates = [];
+      
+      // Add stock movement operations to our parallel tasks list
       for (final cartItem in state.cartItems) {
-        await _inventoryRepository.createStockMovement(
-          StockMovement(
-            productId: cartItem.product.id!,
-            branchId: branchId,
-            type: AppConstants.stockMovementSale,
-            quantity: -cartItem.quantity, // Negative for sale
-            unitCost: cartItem.product.costPrice,
-            reference: sale.saleNumber,
-            createdAt: DateTime.now(),
-            userId: userId,
+        inventoryUpdates.add(
+          _inventoryRepository.createStockMovement(
+            StockMovement(
+              productId: cartItem.product.id!,
+              branchId: branchId,
+              type: AppConstants.stockMovementSale,
+              quantity: -cartItem.quantity, // Negative for sale
+              unitCost: cartItem.product.costPrice,
+              reference: createdSale.saleNumber,
+              createdAt: DateTime.now(),
+              userId: userId,
+            ),
+          )
+        );
+      }
+      
+      // Add product stock quantity updates to our parallel tasks list
+      for (final cartItem in state.cartItems) {
+        inventoryUpdates.add(_updateProductStock(cartItem.product.id!, cartItem.quantity));
+      }
+      
+      // Add cash session update to our parallel tasks list if needed
+      if (createdSale.paymentMethod == AppConstants.paymentCash && _cashSessionRepository != null) {
+        inventoryUpdates.add(_updateCashSession(createdSale));
+      }
+      
+      // Add loyalty points update to our parallel tasks list if needed
+      if (createdSale.customerId != null) {
+        inventoryUpdates.add(_updateLoyaltyPoints(createdSale));
+      }
+      
+      // Execute all updates in parallel for maximum speed
+      // We don't need to wait for these to complete before showing receipt
+      // These will continue in background after receipt is shown
+      unawaited(Future.wait(inventoryUpdates).catchError((e) {
+        print('Error during inventory updates: $e');
+        // Non-critical errors, we can continue
+      }));
+
+      // Create sale with items for return
+      final saleWithItems = Sale(
+        id: createdSale.id,
+        saleNumber: createdSale.saleNumber,
+        customerId: createdSale.customerId,
+        userId: createdSale.userId,
+        branchId: createdSale.branchId,
+        subtotal: createdSale.subtotal,
+        discountAmount: createdSale.discountAmount,
+        taxAmount: createdSale.taxAmount,
+        totalAmount: createdSale.totalAmount,
+        paymentMethod: createdSale.paymentMethod,
+        status: createdSale.status,
+        createdAt: createdSale.createdAt,
+        items: saleItems,
+      );
+      
+      // Clear cart immediately to give the user instant feedback
+      clearCart();
+      return saleWithItems;
+    } catch (e) {
+      print('Error processing payment: $e');
+      return null;
+    }
+  }
+  
+  // Helper methods for parallel processing
+  
+  // Update product stock levels
+  Future<void> _updateProductStock(int productId, int quantitySold) async {
+    try {
+      final currentProduct = await _productRepository.getProductById(productId);
+      if (currentProduct != null) {
+        final newStockQuantity = (currentProduct.stockQuantity - quantitySold).clamp(0, double.infinity).toInt();
+        await _productRepository.updateProduct(
+          Product(
+            id: currentProduct.id,
+            name: currentProduct.name,
+            sku: currentProduct.sku,
+            barcode: currentProduct.barcode,
+            costPrice: currentProduct.costPrice,
+            sellingPrice: currentProduct.sellingPrice,
+            categoryId: currentProduct.categoryId,
+            stockQuantity: newStockQuantity,
+            lowStockThreshold: currentProduct.lowStockThreshold,
+            unit: currentProduct.unit,
+            description: currentProduct.description,
+            isActive: currentProduct.isActive,
+            createdAt: currentProduct.createdAt,
+            updatedAt: DateTime.now(),
           ),
         );
-        
-        // Update product's stockQuantity field
-        final currentProduct = await _productRepository.getProductById(cartItem.product.id!);
-        if (currentProduct != null) {
-          final newStockQuantity = (currentProduct.stockQuantity - cartItem.quantity).clamp(0, double.infinity).toInt();
-          await _productRepository.updateProduct(
-            Product(
-              id: currentProduct.id,
-              name: currentProduct.name,
-              sku: currentProduct.sku,
-              barcode: currentProduct.barcode,
-              costPrice: currentProduct.costPrice,
-              sellingPrice: currentProduct.sellingPrice,
-              categoryId: currentProduct.categoryId,
-              stockQuantity: newStockQuantity,
-              lowStockThreshold: currentProduct.lowStockThreshold,
-              unit: currentProduct.unit,
-              description: currentProduct.description,
-              isActive: currentProduct.isActive,
-              createdAt: currentProduct.createdAt,
-              updatedAt: DateTime.now(),
-            ),
-          );
-        }
       }
-
-      clearCart();
-      return true;
     } catch (e) {
-      return false;
+      print('Error updating product stock: $e');
+    }
+  }
+  
+  // Update cash session
+  Future<void> _updateCashSession(Sale sale) async {
+    try {
+      final currentSession = await _cashSessionRepository!.getCurrentSession(sale.userId, sale.branchId);
+      if (currentSession != null) {
+        final newExpectedCash = currentSession.expectedCash + sale.totalAmount;
+        await _cashSessionRepository!.updateExpectedCash(currentSession.id!, newExpectedCash);
+      }
+    } catch (e) {
+      print('Error updating cash session: $e');
+    }
+  }
+  
+  // Update loyalty points
+  Future<void> _updateLoyaltyPoints(Sale sale) async {
+    try {
+      final customer = await _customerRepository.getCustomerById(sale.customerId!);
+      if (customer != null) {
+        final pointsEarned = sale.totalAmount * AppConstants.loyaltyPointsRate;
+        final newLoyaltyPoints = customer.loyaltyPoints + pointsEarned;
+        await _customerRepository.updateLoyaltyPoints(sale.customerId!, newLoyaltyPoints);
+      }
+    } catch (e) {
+      print('Error updating loyalty points: $e');
     }
   }
 }
@@ -320,6 +395,7 @@ final posProvider = StateNotifierProvider<PosNotifier, PosState>((ref) {
   final inventoryRepo = ref.watch(inventoryRepositoryProvider);
   final customerRepo = ref.watch(customerRepositoryProvider);
   final taxRateRepo = ref.watch(taxRateRepositoryProvider);
-  return PosNotifier(productRepo, saleRepo, inventoryRepo, customerRepo, taxRateRepo);
+  final cashSessionRepo = ref.watch(cashSessionRepositoryProvider);
+  return PosNotifier(productRepo, saleRepo, inventoryRepo, customerRepo, taxRateRepo, cashSessionRepo);
 });
 

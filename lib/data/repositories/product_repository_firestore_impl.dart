@@ -146,12 +146,18 @@ class ProductRepositoryFirestoreImpl implements ProductRepository {
     final docId = category.id != null ? idToDocId(category.id!) : generateDocId();
     final now = DateTime.now();
     
-    await _firestore.collection('categories').doc(docId).set({
+    final data = <String, dynamic>{
       'name': category.name,
       'description': category.description,
       'createdAt': Timestamp.fromDate(now),
       'updatedAt': Timestamp.fromDate(now),
-    });
+    };
+    
+    if (category.parentCategoryId != null) {
+      data['parentCategoryId'] = category.parentCategoryId;
+    }
+    
+    await _firestore.collection('categories').doc(docId).set(data);
 
     return category.copyWith(id: docIdToId(docId), createdAt: now, updatedAt: now);
   }
@@ -160,11 +166,19 @@ class ProductRepositoryFirestoreImpl implements ProductRepository {
   Future<domain.Category> updateCategory(domain.Category category) async {
     if (category.id == null) throw Exception('Category ID is required');
 
-    await _firestore.collection('categories').doc(idToDocId(category.id!)).update({
+    final data = <String, dynamic>{
       'name': category.name,
       'description': category.description,
       'updatedAt': Timestamp.fromDate(DateTime.now()),
-    });
+    };
+    
+    if (category.parentCategoryId != null) {
+      data['parentCategoryId'] = category.parentCategoryId;
+    } else {
+      data['parentCategoryId'] = FieldValue.delete();
+    }
+
+    await _firestore.collection('categories').doc(idToDocId(category.id!)).update(data);
 
     return category;
   }
@@ -211,6 +225,7 @@ class ProductRepositoryFirestoreImpl implements ProductRepository {
       id: docIdToId(doc.id),
       name: data['name'] as String,
       description: data['description'] as String?,
+      parentCategoryId: (data['parentCategoryId'] as num?)?.toInt(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );

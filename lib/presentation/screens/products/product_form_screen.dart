@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/tax_rate_provider.dart';
+import '../../providers/sku_settings_provider.dart';
 import '../../../domain/entities/product.dart';
 import '../../../domain/entities/category.dart';
-import '../../../domain/entities/tax_rate.dart';
+import '../../../data/services/sku_generator_service.dart';
 import '../../widgets/barcode_scanner_widget.dart';
 
 class ProductFormScreen extends ConsumerStatefulWidget {
@@ -37,6 +39,19 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   @override
   void initState() {
     super.initState();
+    // Load categories when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(productProvider.notifier).loadCategories();
+      
+      // Auto-generate SKU for new products if enabled
+      if (widget.product == null) {
+        final skuSettings = ref.read(skuSettingsProvider);
+        if (skuSettings.autoGenerate) {
+          _generateSku();
+        }
+      }
+    });
+    
     if (widget.product != null) {
       _nameController.text = widget.product!.name;
       _skuController.text = widget.product!.sku ?? '';
@@ -54,7 +69,44 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     } else {
       _lowStockThresholdController.text = '10';
       _unitController.text = 'pcs';
+      _stockController.text = '0';
+      _costPriceController.text = '0.0';
+      _sellingPriceController.text = '0.0';
     }
+  }
+  
+  Future<void> _generateSku() async {
+    final skuSettings = ref.read(skuSettingsProvider);
+    
+    // Get the selected category name if available
+    String? categoryPrefix;
+    if (_selectedCategoryId != null) {
+      final categories = ref.read(productProvider).categories;
+      final selectedCategory = categories.firstWhere(
+        (category) => category.id == _selectedCategoryId,
+        orElse: () => Category(
+          name: '',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      categoryPrefix = selectedCategory.name.isNotEmpty ? selectedCategory.name.substring(0, min(3, selectedCategory.name.length)) : null;
+    }
+    
+    // Get the next sequential number
+    final sequentialNumber = await ref.read(skuSettingsProvider.notifier).getNextSequentialNumber();
+    
+    // Generate the SKU
+    final sku = SkuGeneratorService.generateSku(
+      pattern: skuSettings.pattern,
+      productName: _nameController.text.isNotEmpty ? _nameController.text : 'Product',
+      categoryPrefix: categoryPrefix,
+      sequentialNumber: sequentialNumber,
+    );
+    
+    setState(() {
+      _skuController.text = sku;
+    });
   }
 
   @override
@@ -69,6 +121,52 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     _descriptionController.dispose();
     _unitController.dispose();
     super.dispose();
+  }
+
+  List<DropdownMenuItem<int?>> _buildCategoryItems(List<Category> categories) {
+    final items = <DropdownMenuItem<int?>>[];
+    
+    if (categories.isEmpty) {
+      return items; // Return empty list if no categories
+    }
+    
+    // Get parent categories (categories without a parent)
+    final parentCategories = categories
+        .where((c) => c.parentCategoryId == null && c.id != null)
+        .toList();
+    
+    for (final parent in parentCategories) {
+      if (parent.id == null) continue; // Skip if no ID
+      
+      // Add parent category
+      items.add(
+        DropdownMenuItem<int?>(
+          value: parent.id,
+          child: Text(parent.name),
+        ),
+      );
+      
+      // Add subcategories under this parent
+      final subcategories = categories
+          .where((c) => c.parentCategoryId == parent.id && c.id != null)
+          .toList();
+      
+      for (final subcategory in subcategories) {
+        if (subcategory.id == null) continue; // Skip if no ID
+        
+        items.add(
+          DropdownMenuItem<int?>(
+            value: subcategory.id,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 24.0),
+              child: Text('  └─ ${subcategory.name}'),
+            ),
+          ),
+        );
+      }
+    }
+    
+    return items;
   }
 
   Future<void> _scanBarcode(BuildContext context) async {
@@ -104,11 +202,43 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
     setState(() => _isLoading = true);
 
+    // Debug tax rates
+    print('DEBUG PRODUCT FORM: Selected tax rate IDs: $_selectedTaxRateIds');
+    
+    // Debug tax rates in provider
+    final taxRateState = ref.read(taxRateProvider);
+    print('DEBUG PRODUCT FORM: Available tax rates: ${taxRateState.taxRates.length}');
+    for (final rate in taxRateState.taxRates) {
+      print('DEBUG PRODUCT FORM: Tax rate: ${rate.id} - ${rate.name} - ${rate.rate}%');
+    }
+
     try {
+      // Check SKU uniqueness if provided
+      final sku = _skuController.text.trim().isEmpty ? null : _skuController.text.trim();
+      if (sku != null) {
+        final isUnique = await ref.read(productProvider.notifier).isSkuUnique(
+          sku, 
+          excludeProductId: widget.product?.id,
+        );
+        
+        if (!isUnique) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Error: SKU already exists. Please use a different SKU.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+            ),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
+      
       final product = Product(
         id: widget.product?.id,
         name: _nameController.text.trim(),
-        sku: _skuController.text.trim().isEmpty ? null : _skuController.text.trim(),
+        sku: sku,
         barcode: _barcodeController.text.trim().isEmpty
             ? null
             : _barcodeController.text.trim(),
@@ -134,26 +264,29 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         await ref.read(productProvider.notifier).updateProduct(product);
       }
 
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.product == null
-                ? 'Product created successfully'
-                : 'Product updated successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      if (!mounted) return;
+      
+      Navigator.pop(context);
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.product == null
+              ? 'Product created successfully'
+              : 'Product updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -204,12 +337,26 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     decoration: InputDecoration(
                       labelText: 'SKU',
                       prefixIcon: const Icon(Icons.qr_code),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _generateSku,
+                        tooltip: 'Generate SKU',
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
                       fillColor: Colors.grey.shade50,
                     ),
+                    validator: (value) {
+                      if (value != null && value.isNotEmpty) {
+                        // SKU validation will be done asynchronously in _saveProduct
+                        if (value.contains(' ')) {
+                          return 'SKU should not contain spaces';
+                        }
+                      }
+                      return null;
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -235,7 +382,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            // Category
+            // Category (with hierarchical display)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
@@ -254,12 +401,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     value: null,
                     child: Text('No Category'),
                   ),
-                  ...categories.map((category) {
-                    return DropdownMenuItem<int?>(
-                      value: category.id,
-                      child: Text(category.name),
-                    );
-                  }),
+                  ..._buildCategoryItems(categories),
                 ],
                 onChanged: (value) {
                   setState(() {

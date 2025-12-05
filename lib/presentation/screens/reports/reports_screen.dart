@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:csv/csv.dart';
-import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io' if (dart.library.html) 'dart:html' as io;
 import '../../providers/sale_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../../domain/entities/sale.dart';
+import '../../../domain/entities/sale_item.dart';
 import '../../../domain/entities/product.dart';
+import '../../../core/file_helper.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -23,6 +23,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
   String _selectedReport = 'sales';
+  Map<int, List<SaleItem>> _saleItemsMap = {}; // Cache for sale items
+  bool _isLoadingSaleItems = false;
 
   @override
   void initState() {
@@ -42,6 +44,43 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         );
   }
 
+  Future<void> _loadSaleItemsForProfitReport() async {
+    if (_isLoadingSaleItems) return;
+    
+    setState(() {
+      _isLoadingSaleItems = true;
+    });
+
+    try {
+      final salesState = ref.read(saleProvider);
+      final sales = salesState.sales;
+      
+      // Load sale items for all sales
+      final Map<int, List<SaleItem>> itemsMap = {};
+      for (final sale in sales) {
+        if (sale.id != null) {
+          try {
+            final items = await ref.read(saleProvider.notifier).getSaleItems(sale.id!);
+            itemsMap[sale.id!] = items;
+          } catch (e) {
+            // If loading fails for a sale, continue with others
+            print('Error loading items for sale ${sale.id}: $e');
+          }
+        }
+      }
+      
+      setState(() {
+        _saleItemsMap = itemsMap;
+        _isLoadingSaleItems = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingSaleItems = false;
+      });
+      print('Error loading sale items: $e');
+    }
+  }
+
   Future<void> _selectDateRange(BuildContext context) async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
@@ -55,8 +94,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       setState(() {
         _startDate = picked.start;
         _endDate = picked.end;
+        _saleItemsMap = {}; // Clear cached items when date range changes
       });
       _loadData();
+      // Reload sale items if profit report is selected
+      if (_selectedReport == 'profit') {
+        _loadSaleItemsForProfitReport();
+      }
     }
   }
 
@@ -82,20 +126,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         final csvString = const ListToCsvConverter().convert(csvData);
         final fileName = 'sales_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
 
-        if (kIsWeb) {
-          // For web, use share_plus with text directly
-          await Share.share(csvString, subject: 'Sales Report');
-        } else {
-          // For mobile platforms (iOS/Android)
-          final directory = await getTemporaryDirectory();
-          final file = io.File('${directory.path}/$fileName');
-          await file.writeAsString(csvString);
-          
-          await Share.shareXFiles(
-            [XFile(file.path)],
-            text: 'Sales Report',
-          );
-        }
+        // Use FileHelper for platform-agnostic file sharing
+        await FileHelper.saveAndShare(
+          content: csvString,
+          fileName: fileName,
+          subject: 'Sales Report',
+        );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -186,6 +222,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     setState(() {
                       _selectedReport = newSelection.first;
                     });
+                    // Load sale items when profit report is selected
+                    if (newSelection.first == 'profit') {
+                      _loadSaleItemsForProfitReport();
+                    }
                   },
                 ),
               ],
@@ -354,12 +394,37 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   }
 
   Widget _buildProfitReport(SaleState salesState, ProductState productsState) {
-    // Simplified profit calculation
+    // Calculate actual profit from sale items and product costs
     final sales = salesState.sales;
     final totalRevenue = sales.fold(0.0, (sum, sale) => sum + sale.totalAmount);
-    // Would need to calculate actual cost from sale items
-    final estimatedCost = totalRevenue * 0.6; // Placeholder
-    final profit = totalRevenue - estimatedCost;
+    
+    // Show loading indicator if sale items are being loaded
+    if (_isLoadingSaleItems) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    // Create a map of productId -> costPrice for quick lookup
+    final productCostMap = <int, double>{};
+    for (final product in productsState.products) {
+      if (product.id != null) {
+        productCostMap[product.id!] = product.costPrice;
+      }
+    }
+    
+    // Calculate total cost from sale items
+    double totalCost = 0.0;
+    for (final sale in sales) {
+      if (sale.id != null && _saleItemsMap.containsKey(sale.id)) {
+        // Use cached sale items
+        final items = _saleItemsMap[sale.id]!;
+        for (final item in items) {
+          final costPrice = productCostMap[item.productId] ?? 0.0;
+          totalCost += costPrice * item.quantity;
+        }
+      }
+    }
+    
+    final profit = totalRevenue - totalCost;
     final margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
 
     return SingleChildScrollView(
@@ -376,7 +441,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           const SizedBox(height: 12),
           _buildSummaryCard(
             'Total Cost',
-            'TK ${estimatedCost.toStringAsFixed(2)}',
+            'TK ${totalCost.toStringAsFixed(2)}',
             Icons.trending_down,
             Colors.red,
           ),

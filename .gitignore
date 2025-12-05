@@ -43,3 +43,18 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/build/
+/android/.gradle/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Test files (optional - remove if you want to keep them)
+lib/cart_test_standalone.dart
+lib/main_cart_test.dart
+lib/main_simple.dart
+lib/main_test.dart
+lib/test_cart_app.dart
+lib/presentation/screens/pos/test_cart_data.dart

@@ -23,6 +23,7 @@ A comprehensive, cloud-based Point of Sale (POS) system built with Flutter and F
 - [Installation](#-installation)
 - [Firebase Setup](#-firebase-setup)
 - [Quick Start](#-quick-start)
+- [Desktop Version](#-desktop-version)
 - [Project Structure](#-project-structure)
 - [Role-Based Access Control](#-role-based-access-control)
 - [Usage Guide](#-usage-guide)
@@ -95,6 +96,14 @@ A comprehensive, cloud-based Point of Sale (POS) system built with Flutter and F
 - **Dart** - Programming language
 - **Riverpod** - State management
 - **Material Design** - UI components
+
+### Platforms
+- **Web** - Browser-based access
+- **Android** - Mobile app
+- **iOS** - Mobile app
+- **Windows** - Desktop application
+- **macOS** - Desktop application (coming soon)
+- **Linux** - Desktop application (coming soon)
 
 ### Backend & Services
 - **Firebase Auth** - Authentication
@@ -245,6 +254,37 @@ Repeat for manager and cashier with appropriate values.
 4. **Start using the app!**
 
 For detailed login instructions, see [QUICK_START_LOGIN.md](QUICK_START_LOGIN.md)
+
+## 🖥️ Desktop Version
+
+Aronium POS is also available as a desktop application for Windows.
+
+### Building for Windows
+
+1. **Install Visual Studio 2019** with "Desktop development with C++" workload
+   - See [VISUAL_STUDIO_2019_INSTALL_GUIDE.md](VISUAL_STUDIO_2019_INSTALL_GUIDE.md) for detailed instructions
+   - Flutter Windows build requires specifically Visual Studio 2019
+
+2. **Build the Windows app**:
+   ```bash
+   # Option 1: Use the build script
+   build_windows_vs2019.bat
+   
+   # Option 2: Build manually
+   flutter build windows --release
+   ```
+
+3. **Run the executable**:
+   ```bash
+   cd build\windows\x64\runner\Release
+   aronium.exe
+   ```
+
+4. **Create a distribution package**:
+   - Zip the entire Release folder, or
+   - Use the included Inno Setup script to create an installer
+
+For detailed instructions, see [DESKTOP_README.md](DESKTOP_README.md)
 
 ## 📁 Project Structure
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../providers/cash_session_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../../domain/entities/cash_session.dart';
 
 class CashSessionScreen extends ConsumerStatefulWidget {
@@ -25,6 +26,8 @@ class _CashSessionScreenState extends ConsumerState<CashSessionScreen> {
       final user = authState.user;
       if (user != null && user.id != null) {
         final branchId = 1; // Default branch
+        // Ensure users are loaded for display
+        ref.read(userProvider.notifier).loadUsers();
         ref.read(cashSessionProvider.notifier).loadCurrentSession(user.id!, branchId);
         ref.read(cashSessionProvider.notifier).loadSessions(userId: user.id!, branchId: branchId);
       }
@@ -134,12 +137,32 @@ class _CashSessionScreenState extends ConsumerState<CashSessionScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        final errorMessage = e.toString();
+        // If session is already closed, treat it as success (state might be out of sync)
+        if (errorMessage.contains('already closed') || errorMessage.contains('Session is already closed')) {
+          _countedCashController.clear();
+          // Refresh the state
+          final authState = ref.read(authProvider);
+          final user = authState.user;
+          if (user != null && user.id != null) {
+            final branchId = 1;
+            ref.read(cashSessionProvider.notifier).loadCurrentSession(user.id!, branchId);
+            ref.read(cashSessionProvider.notifier).loadSessions(userId: user.id!, branchId: branchId);
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Session is already closed'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $errorMessage'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -147,8 +170,7 @@ class _CashSessionScreenState extends ConsumerState<CashSessionScreen> {
   @override
   Widget build(BuildContext context) {
     final sessionState = ref.watch(cashSessionProvider);
-    final authState = ref.watch(authProvider);
-    final currentUser = authState.user;
+    final usersState = ref.watch(userProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -158,9 +180,11 @@ class _CashSessionScreenState extends ConsumerState<CashSessionScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
+              final authState = ref.read(authProvider);
               final user = authState.user;
               if (user != null && user.id != null) {
                 final branchId = 1;
+                ref.read(cashSessionProvider.notifier).refreshExpectedCash();
                 ref.read(cashSessionProvider.notifier).loadCurrentSession(user.id!, branchId);
                 ref.read(cashSessionProvider.notifier).loadSessions(userId: user.id!, branchId: branchId);
               }
@@ -169,13 +193,15 @@ class _CashSessionScreenState extends ConsumerState<CashSessionScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Current Session Card
-            if (sessionState.currentSession != null)
+      body: sessionState.isLoading && sessionState.currentSession == null
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Current Session Card
+                  if (sessionState.currentSession != null)
               Card(
                 elevation: 2,
                 shape: RoundedRectangleBorder(
@@ -224,49 +250,80 @@ class _CashSessionScreenState extends ConsumerState<CashSessionScreen> {
                       ),
                       _buildInfoRow(
                         'Opened By',
-                        currentUser?.username ?? 'Unknown',
+                        _getUserName(ref, sessionState.currentSession!.userId, usersState.users) ?? 'Unknown',
                       ),
                       _buildInfoRow(
                         'Starting Cash',
                         'TK ${sessionState.currentSession!.openingCash.toStringAsFixed(2)}',
                       ),
-                      const Divider(height: 24),
-                      // Close Session
-                      TextField(
-                        controller: _countedCashController,
-                        decoration: InputDecoration(
-                          labelText: 'Counted Cash *',
-                          prefixIcon: const Icon(Icons.attach_money),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey.shade50,
-                        ),
-                        keyboardType: TextInputType.number,
+                      _buildInfoRow(
+                        'Expected Cash',
+                        'TK ${sessionState.currentSession!.expectedCash.toStringAsFixed(2)}',
                       ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _closeSession,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: Colors.red,
-                            shape: RoundedRectangleBorder(
+                      // Only show close session UI if session is actually open
+                      if (sessionState.currentSession!.isOpen) ...[
+                        const Divider(height: 24),
+                        // Close Session
+                        TextField(
+                          controller: _countedCashController,
+                          decoration: InputDecoration(
+                            labelText: 'Counted Cash *',
+                            prefixIcon: const Icon(Icons.attach_money),
+                            border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                           ),
-                          child: const Text(
-                            'Close Session',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _closeSession,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              backgroundColor: Colors.red,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'Close Session',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                      ] else ...[
+                        const Divider(height: 24),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.info, color: Colors.blue),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'This session is already closed',
+                                  style: TextStyle(
+                                    color: Colors.blue,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -381,8 +438,16 @@ class _CashSessionScreenState extends ConsumerState<CashSessionScreen> {
                                 title: Text(
                                   DateFormat('MMM dd, yyyy • HH:mm').format(session.openedAt),
                                 ),
-                                subtitle: Text(
-                                  'Starting: TK ${session.openingCash.toStringAsFixed(2)}',
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Opened by: ${_getUserName(ref, session.userId, usersState.users) ?? 'Unknown'}',
+                                    ),
+                                    Text(
+                                      'Starting: TK ${session.openingCash.toStringAsFixed(2)}',
+                                    ),
+                                  ],
                                 ),
                                 trailing: session.isClosed
                                     ? Column(
@@ -414,9 +479,9 @@ class _CashSessionScreenState extends ConsumerState<CashSessionScreen> {
                           },
                         ),
                       ),
-          ],
-        ),
-      ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -443,5 +508,27 @@ class _CashSessionScreenState extends ConsumerState<CashSessionScreen> {
         ],
       ),
     );
+  }
+
+  String? _getUserName(WidgetRef ref, int userId, List users) {
+    try {
+      // First, check if this is the current logged-in user
+      final authState = ref.read(authProvider);
+      final currentUser = authState.user;
+      if (currentUser != null && currentUser.id == userId) {
+        return currentUser.fullName ?? currentUser.username;
+      }
+      
+      // Then search through the users list
+      for (final user in users) {
+        if (user.id == userId) {
+          return user.fullName ?? user.username;
+        }
+      }
+    } catch (e) {
+      // If users list is not loaded or has different structure, return null
+      print('Error getting user name: $e');
+    }
+    return null;
   }
 }

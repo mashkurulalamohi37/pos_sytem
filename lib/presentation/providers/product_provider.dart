@@ -177,6 +177,21 @@ class ProductNotifier extends StateNotifier<ProductState> {
       return null;
     }
   }
+  
+  Future<bool> isSkuUnique(String sku, {int? excludeProductId}) async {
+    try {
+      // Check if any product has this SKU
+      final products = state.products.where((p) => 
+        p.sku?.toLowerCase() == sku.toLowerCase() && 
+        p.id != excludeProductId
+      ).toList();
+      
+      return products.isEmpty;
+    } catch (e) {
+      // In case of error, assume it's not unique to be safe
+      return false;
+    }
+  }
 }
 
 final productProvider = StateNotifierProvider<ProductNotifier, ProductState>((ref) {

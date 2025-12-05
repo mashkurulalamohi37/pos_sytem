@@ -179,6 +179,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                     : ListView.builder(
                         padding: const EdgeInsets.all(12),
                         itemCount: salesState.sales.length,
+                        // Performance: Optimize list rendering
+                        cacheExtent: 500,
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
                         itemBuilder: (context, index) {
                           final sale = salesState.sales[index];
                           return _buildSaleCard(sale, canDelete);

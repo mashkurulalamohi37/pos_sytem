@@ -52,6 +52,7 @@ dependencies:
   intl: ^0.19.0
   uuid: ^4.5.1
   equatable: ^2.0.5
+  shared_preferences: ^2.2.2
   
   # PDF & Printing
   pdf: ^3.11.1
@@ -64,11 +65,20 @@ dependencies:
   # File handling
   share_plus: ^10.1.2
   csv: ^6.0.0
+  file_picker: ^8.1.4
   
   # Firebase
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
   cloud_firestore: ^5.4.3
+  
+  # Desktop Support
+  window_size:
+    git:
+      url: https://github.com/google/flutter-desktop-embedding.git
+      path: plugins/window_size
+      ref: 6c66ad23ee79749f30a8eece542cf54eaf157ed8
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

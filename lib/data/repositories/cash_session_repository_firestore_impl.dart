@@ -16,7 +16,8 @@ class CashSessionRepositoryFirestoreImpl implements CashSessionRepository {
       throw Exception('An open session already exists for this user and branch');
     }
 
-    final docId = session.id != null ? idToDocId(session.id!) : generateDocId();
+    // Always generate a new document ID when opening a session
+    final docId = generateDocId();
     final now = DateTime.now();
 
     await _firestore.collection('cashSessions').doc(docId).set({
@@ -46,23 +47,58 @@ class CashSessionRepositoryFirestoreImpl implements CashSessionRepository {
       throw Exception('Session is already closed');
     }
 
-    final difference = countedCash - session.expectedCash;
+    // Recalculate expected cash from all cash sales during the session
+    final recalculatedExpectedCash = await _calculateExpectedCash(
+      session.userId,
+      session.branchId,
+      session.openedAt,
+      session.openingCash,
+    );
+
+    final difference = countedCash - recalculatedExpectedCash;
     final now = DateTime.now();
 
-    // Find the document by searching for the session
+    // Find the document by searching for open sessions matching the session ID hash
+    // Since sessionId is a hash of doc.id, we need to find the doc that produces this hash
     final snapshot = await _firestore.collection('cashSessions')
         .where('userId', isEqualTo: session.userId)
         .where('branchId', isEqualTo: session.branchId)
-        .where('openedAt', isEqualTo: Timestamp.fromDate(session.openedAt))
         .where('status', isEqualTo: 'open')
-        .limit(1)
         .get();
 
-    if (snapshot.docs.isEmpty) {
-      throw Exception('Session document not found');
+    // Find the document whose ID hash matches the sessionId
+    DocumentSnapshot? matchingDoc;
+    for (final doc in snapshot.docs) {
+      // Check if this document's ID hash matches the sessionId
+      if (doc.id.hashCode == sessionId) {
+        matchingDoc = doc;
+        break;
+      }
     }
 
-    await snapshot.docs.first.reference.update({
+    // If not found by hash, try matching by openedAt (fallback)
+    if (matchingDoc == null) {
+      for (final doc in snapshot.docs) {
+        final dataMap = doc.data() as Map<String, dynamic>;
+        final docOpenedAt = (dataMap['openedAt'] as Timestamp?)?.toDate();
+        if (docOpenedAt != null) {
+          // Compare dates with tolerance (within 5 seconds)
+          final timeDiff = (docOpenedAt.difference(session.openedAt)).abs();
+          if (timeDiff.inSeconds <= 5) {
+            matchingDoc = doc;
+            break;
+          }
+        }
+      }
+    }
+
+    if (matchingDoc == null) {
+      throw Exception('Session document not found. SessionId: $sessionId, UserId: ${session.userId}, BranchId: ${session.branchId}');
+    }
+
+    // Update the document
+    await matchingDoc.reference.update({
+      'expectedCash': recalculatedExpectedCash,
       'countedCash': countedCash,
       'difference': difference,
       'closedAt': Timestamp.fromDate(now),
@@ -71,12 +107,52 @@ class CashSessionRepositoryFirestoreImpl implements CashSessionRepository {
     });
 
     return session.copyWith(
+      expectedCash: recalculatedExpectedCash,
       countedCash: countedCash,
       difference: difference,
       closedAt: now,
       status: 'closed',
       notes: notes,
     );
+  }
+
+  /// Calculate expected cash: openingCash + sum of all cash sales during session
+  Future<double> _calculateExpectedCash(
+    int userId,
+    int branchId,
+    DateTime sessionOpenedAt,
+    double openingCash,
+  ) async {
+    // Firestore requires composite indexes for multiple where clauses with range queries
+    // To avoid index requirements, we'll fetch sales with minimal filters and filter in memory
+    // This works fine for small to medium datasets
+    
+    // Fetch sales for this user/branch (using only two where clauses to avoid index requirement)
+    // Note: We don't use orderBy here to avoid index requirements
+    final salesSnapshot = await _firestore.collection('sales')
+        .where('userId', isEqualTo: userId)
+        .where('branchId', isEqualTo: branchId)
+        .get();
+
+    // Filter in memory for paymentMethod, status, and date range
+    double totalCashSales = 0.0;
+    for (final doc in salesSnapshot.docs) {
+      final data = doc.data();
+      final paymentMethod = data['paymentMethod'] as String? ?? '';
+      final status = data['status'] as String? ?? '';
+      final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
+      
+      // Check if sale matches our criteria
+      if (paymentMethod == 'cash' && 
+          status == 'completed' && 
+          createdAt != null && 
+          createdAt.isAfter(sessionOpenedAt.subtract(const Duration(seconds: 1)))) {
+        final totalAmount = (data['totalAmount'] as num?)?.toDouble() ?? 0.0;
+        totalCashSales += totalAmount;
+      }
+    }
+
+    return openingCash + totalCashSales;
   }
 
   @override
@@ -160,40 +236,87 @@ class CashSessionRepositoryFirestoreImpl implements CashSessionRepository {
     final session = await getSessionById(sessionId);
     if (session == null) throw Exception('Session not found');
 
-    // Find the document
+    // Find the document using simpler query
     final snapshot = await _firestore.collection('cashSessions')
         .where('userId', isEqualTo: session.userId)
         .where('branchId', isEqualTo: session.branchId)
-        .where('openedAt', isEqualTo: Timestamp.fromDate(session.openedAt))
-        .limit(1)
         .get();
 
-    if (snapshot.docs.isEmpty) {
+    // Find the matching session by comparing openedAt in memory
+    DocumentSnapshot? matchingDoc;
+    for (final doc in snapshot.docs) {
+      final dataMap = doc.data() as Map<String, dynamic>;
+      final docOpenedAt = (dataMap['openedAt'] as Timestamp?)?.toDate();
+      if (docOpenedAt != null) {
+        // Compare dates (ignore milliseconds for matching)
+        final sessionOpenedAtRounded = DateTime(
+          session.openedAt.year,
+          session.openedAt.month,
+          session.openedAt.day,
+          session.openedAt.hour,
+          session.openedAt.minute,
+          session.openedAt.second,
+        );
+        final docOpenedAtRounded = DateTime(
+          docOpenedAt.year,
+          docOpenedAt.month,
+          docOpenedAt.day,
+          docOpenedAt.hour,
+          docOpenedAt.minute,
+          docOpenedAt.second,
+        );
+        if (sessionOpenedAtRounded == docOpenedAtRounded) {
+          matchingDoc = doc;
+          break;
+        }
+      }
+    }
+
+    if (matchingDoc == null) {
       throw Exception('Session document not found');
     }
 
-    await snapshot.docs.first.reference.update({
+    await matchingDoc.reference.update({
       'expectedCash': amount,
       'updatedAt': Timestamp.fromDate(DateTime.now()),
     });
   }
 
+  /// Calculate and update expected cash for current session
+  Future<void> recalculateExpectedCash(int sessionId) async {
+    final session = await getSessionById(sessionId);
+    if (session == null || session.status != 'open') return;
+
+    final recalculatedExpectedCash = await _calculateExpectedCash(
+      session.userId,
+      session.branchId,
+      session.openedAt,
+      session.openingCash,
+    );
+
+    await updateExpectedCash(sessionId, recalculatedExpectedCash);
+  }
+
   domain.CashSession _toCashSession(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final data = doc.data();
+    if (data == null) {
+      throw Exception('Session document has no data');
+    }
+    final dataMap = data as Map<String, dynamic>;
     // Use document ID hash as numeric ID for compatibility
     final numericId = doc.id.hashCode;
     return domain.CashSession(
       id: numericId,
-      userId: (data['userId'] as num?)?.toInt() ?? 0,
-      branchId: (data['branchId'] as num?)?.toInt() ?? 0,
-      openingCash: (data['openingCash'] as num?)?.toDouble() ?? 0.0,
-      expectedCash: (data['expectedCash'] as num?)?.toDouble() ?? 0.0,
-      countedCash: (data['countedCash'] as num?)?.toDouble(),
-      difference: (data['difference'] as num?)?.toDouble(),
-      openedAt: (data['openedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      closedAt: (data['closedAt'] as Timestamp?)?.toDate(),
-      status: data['status'] as String? ?? 'open',
-      notes: data['notes'] as String?,
+      userId: (dataMap['userId'] as num?)?.toInt() ?? 0,
+      branchId: (dataMap['branchId'] as num?)?.toInt() ?? 0,
+      openingCash: (dataMap['openingCash'] as num?)?.toDouble() ?? 0.0,
+      expectedCash: (dataMap['expectedCash'] as num?)?.toDouble() ?? 0.0,
+      countedCash: (dataMap['countedCash'] as num?)?.toDouble(),
+      difference: (dataMap['difference'] as num?)?.toDouble(),
+      openedAt: (dataMap['openedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      closedAt: (dataMap['closedAt'] as Timestamp?)?.toDate(),
+      status: dataMap['status'] as String? ?? 'open',
+      notes: dataMap['notes'] as String?,
     );
   }
 }

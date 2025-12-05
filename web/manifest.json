@@ -1,12 +1,12 @@
 {
-    "name": "aronium",
-    "short_name": "aronium",
+    "name": "Aronium POS",
+    "short_name": "Aronium",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "description": "Full-Featured Point of Sale System with Inventory Management",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

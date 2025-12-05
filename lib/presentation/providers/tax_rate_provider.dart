@@ -31,16 +31,24 @@ class TaxRateNotifier extends StateNotifier<TaxRateState> {
   }
 
   Future<void> loadTaxRates() async {
+    print('DEBUG TaxRateProvider: Loading tax rates');
     state = state.copyWith(isLoading: true);
     try {
       final taxRates = await _taxRateRepository.getTaxRates();
+      print('DEBUG TaxRateProvider: Loaded ${taxRates.length} tax rates');
+      
+      // Print details of each tax rate
+      for (final rate in taxRates) {
+        print('DEBUG TaxRateProvider: Tax rate ID: ${rate.id}, Name: ${rate.name}, Rate: ${rate.rate}%');
+      }
+      
       state = state.copyWith(
         taxRates: taxRates,
         isLoading: false,
       );
     } catch (e) {
       // Log error for debugging
-      print('Error loading tax rates: $e');
+      print('DEBUG TaxRateProvider: Error loading tax rates: $e');
       state = state.copyWith(
         taxRates: [],
         isLoading: false,
