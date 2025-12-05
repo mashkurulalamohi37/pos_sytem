@@ -808,7 +808,7 @@ class CartItemWidget extends ConsumerWidget {
                         ),
                         SizedBox(width: kIsWeb ? 6 : 8),
                         
-                        // Product Info - Name and tax info
+                        // Product Info - Name, price, and tax info
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -823,6 +823,14 @@ class CartItemWidget extends ConsumerWidget {
                                 ),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'TK ${item.unitPrice.toStringAsFixed(2)} × ${item.quantity}',
+                                style: TextStyle(
+                                  fontSize: kIsWeb ? 10 : 11,
+                                  color: Colors.grey.shade700,
+                                ),
                               ),
                               if (item.taxRates.isNotEmpty)
                                 Text(
