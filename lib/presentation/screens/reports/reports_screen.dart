@@ -107,31 +107,50 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Future<void> _exportToCSV() async {
     try {
       final salesState = ref.read(saleProvider);
+      final productsState = ref.read(productProvider);
       final sales = salesState.sales;
+      
+      String csvString;
+      String fileName;
+      String subject;
+      
+      switch (_selectedReport) {
+        case 'sales':
+          csvString = _exportSalesReport(sales);
+          fileName = 'sales_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
+          subject = 'Sales Report';
+          break;
+        case 'products':
+          csvString = _exportProductsReport(productsState.products);
+          fileName = 'products_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
+          subject = 'Products Report';
+          break;
+        case 'profit':
+          csvString = await _exportProfitReport(salesState, productsState);
+          fileName = 'profit_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
+          subject = 'Profit Report';
+          break;
+        default:
+          csvString = _exportSalesReport(sales);
+          fileName = 'report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
+          subject = 'Report';
+      }
 
-      final csvData = [
-        ['Sale Number', 'Date', 'Time', 'Subtotal', 'Discount', 'Tax', 'Total', 'Payment Method'],
-        ...sales.map((sale) => [
-              sale.saleNumber,
-              DateFormat('dd-MMM-yyyy').format(sale.createdAt), // Format: 01-Jan-2024
-              DateFormat('HH:mm').format(sale.createdAt),
-              sale.subtotal.toStringAsFixed(2),
-              sale.discountAmount.toStringAsFixed(2),
-              sale.taxAmount.toStringAsFixed(2),
-              sale.totalAmount.toStringAsFixed(2),
-              sale.paymentMethod,
-            ]),
-      ];
-
-        final csvString = const ListToCsvConverter().convert(csvData);
-        final fileName = 'sales_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
-
-        // Use FileHelper for platform-agnostic file sharing
-        await FileHelper.saveAndShare(
-          content: csvString,
-          fileName: fileName,
-          subject: 'Sales Report',
+      // Use FileHelper for platform-agnostic file sharing
+      await FileHelper.saveAndShare(
+        content: csvString,
+        fileName: fileName,
+        subject: subject,
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$subject exported successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -144,6 +163,134 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
   }
 
+  String _exportSalesReport(List<Sale> sales) {
+    final csvData = [
+      ['Sale Number', 'Date', 'Time', 'Subtotal', 'Discount', 'Tax', 'Total', 'Payment Method'],
+      ...sales.map((sale) => [
+            sale.saleNumber,
+            DateFormat('dd-MMM-yyyy').format(sale.createdAt),
+            DateFormat('HH:mm').format(sale.createdAt),
+            sale.subtotal.toStringAsFixed(2),
+            sale.discountAmount.toStringAsFixed(2),
+            sale.taxAmount.toStringAsFixed(2),
+            sale.totalAmount.toStringAsFixed(2),
+            sale.paymentMethod,
+          ]),
+    ];
+    
+    // Add summary row
+    final totalSales = sales.length;
+    final totalAmount = sales.fold(0.0, (sum, sale) => sum + sale.totalAmount);
+    final totalSubtotal = sales.fold(0.0, (sum, sale) => sum + sale.subtotal);
+    final totalDiscount = sales.fold(0.0, (sum, sale) => sum + sale.discountAmount);
+    final totalTax = sales.fold(0.0, (sum, sale) => sum + sale.taxAmount);
+    
+    csvData.add([]); // Empty row
+    csvData.add(['Summary', '', '', '', '', '', '', '']);
+    csvData.add(['Total Sales', totalSales.toString(), '', '', '', '', '', '']);
+    csvData.add(['Total Subtotal', '', '', totalSubtotal.toStringAsFixed(2), '', '', '', '']);
+    csvData.add(['Total Discount', '', '', '', totalDiscount.toStringAsFixed(2), '', '', '']);
+    csvData.add(['Total Tax', '', '', '', '', totalTax.toStringAsFixed(2), '', '']);
+    csvData.add(['Total Amount', '', '', '', '', '', totalAmount.toStringAsFixed(2), '']);
+    
+    return const ListToCsvConverter().convert(csvData);
+  }
+
+  String _exportProductsReport(List<Product> products) {
+    final csvData = [
+      ['Product Name', 'SKU', 'Barcode', 'Category ID', 'Stock Quantity', 'Cost Price', 'Selling Price', 'Unit', 'Status'],
+      ...products.map((product) => [
+            product.name,
+            product.sku ?? '',
+            product.barcode ?? '',
+            product.categoryId?.toString() ?? '',
+            product.stockQuantity.toString(),
+            product.costPrice.toStringAsFixed(2),
+            product.sellingPrice.toStringAsFixed(2),
+            product.unit,
+            product.isActive ? 'Active' : 'Inactive',
+          ]),
+    ];
+    
+    // Add summary
+    final activeProducts = products.where((p) => p.isActive).length;
+    final totalStock = products.fold(0, (sum, p) => sum + p.stockQuantity);
+    final totalValue = products.fold(0.0, (sum, p) => sum + (p.stockQuantity * p.costPrice));
+    
+    csvData.add([]); // Empty row
+    csvData.add(['Summary', '', '', '', '', '', '', '', '']);
+    csvData.add(['Total Products', products.length.toString(), '', '', '', '', '', '', '']);
+    csvData.add(['Active Products', activeProducts.toString(), '', '', '', '', '', '', '']);
+    csvData.add(['Total Stock', '', '', '', totalStock.toString(), '', '', '', '']);
+    csvData.add(['Total Inventory Value', '', '', '', '', totalValue.toStringAsFixed(2), '', '', '']);
+    
+    return const ListToCsvConverter().convert(csvData);
+  }
+
+  Future<String> _exportProfitReport(SaleState salesState, ProductState productsState) async {
+    final sales = salesState.sales;
+    
+    // Load sale items if not already loaded
+    if (_saleItemsMap.isEmpty && !_isLoadingSaleItems) {
+      await _loadSaleItemsForProfitReport();
+    }
+    
+    // Create a map of productId -> costPrice for quick lookup
+    final productCostMap = <int, double>{};
+    for (final product in productsState.products) {
+      if (product.id != null) {
+        productCostMap[product.id!] = product.costPrice;
+      }
+    }
+    
+    final csvData = [
+      ['Sale Number', 'Date', 'Revenue', 'Cost', 'Profit', 'Margin %'],
+    ];
+    
+    double totalRevenue = 0.0;
+    double totalCost = 0.0;
+    
+    for (final sale in sales) {
+      double saleCost = 0.0;
+      if (sale.id != null && _saleItemsMap.containsKey(sale.id)) {
+        final items = _saleItemsMap[sale.id]!;
+        for (final item in items) {
+          final costPrice = productCostMap[item.productId] ?? 0.0;
+          saleCost += costPrice * item.quantity;
+        }
+      }
+      
+      final saleRevenue = sale.totalAmount;
+      final saleProfit = saleRevenue - saleCost;
+      final saleMargin = saleRevenue > 0 ? (saleProfit / saleRevenue) * 100 : 0;
+      
+      totalRevenue += saleRevenue;
+      totalCost += saleCost;
+      
+      csvData.add([
+        sale.saleNumber,
+        DateFormat('dd-MMM-yyyy').format(sale.createdAt),
+        saleRevenue.toStringAsFixed(2),
+        saleCost.toStringAsFixed(2),
+        saleProfit.toStringAsFixed(2),
+        saleMargin.toStringAsFixed(2),
+      ]);
+    }
+    
+    // Add summary
+    final totalProfit = totalRevenue - totalCost;
+    final totalMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+    
+    csvData.add([]); // Empty row
+    csvData.add(['Summary', '', '', '', '', '']);
+    csvData.add(['Total Revenue', '', totalRevenue.toStringAsFixed(2), '', '', '']);
+    csvData.add(['Total Cost', '', '', totalCost.toStringAsFixed(2), '', '']);
+    csvData.add(['Total Profit', '', '', '', totalProfit.toStringAsFixed(2), '']);
+    csvData.add(['Total Margin', '', '', '', '', totalMargin.toStringAsFixed(2) + '%']);
+    
+    return const ListToCsvConverter().convert(csvData);
+  }
+
   @override
   Widget build(BuildContext context) {
     final salesState = ref.watch(saleProvider);
@@ -151,13 +298,33 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reports'),
+        title: const Text(
+          'Reports',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: _exportToCSV,
-            tooltip: 'Export to CSV',
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.download,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              onPressed: _exportToCSV,
+              tooltip: 'Export to CSV',
+            ),
           ),
         ],
       ),
@@ -165,13 +332,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         children: [
           // Date Range and Report Type
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
                   color: Colors.grey.shade200,
-                  blurRadius: 4,
+                  blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -180,31 +347,50 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               children: [
                 InkWell(
                   onTap: () => _selectDateRange(context),
+                  borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: Colors.grey.shade300),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.calendar_today, size: 18),
-                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.calendar_today,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'From: ${_startDate != null ? DateFormat('MMM dd, yyyy').format(_startDate!) : 'Select'}',
-                                style: const TextStyle(fontSize: 12),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade700,
+                                ),
                               ),
+                              const SizedBox(height: 2),
                               Text(
                                 'To: ${_endDate != null ? DateFormat('MMM dd, yyyy').format(_endDate!) : 'Select'}',
-                                style: const TextStyle(fontSize: 12),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade700,
+                                ),
                               ),
                             ],
                           ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 14,
+                          color: Colors.grey.shade400,
                         ),
                       ],
                     ),
@@ -213,9 +399,21 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 const SizedBox(height: 12),
                 SegmentedButton<String>(
                   segments: const [
-                    ButtonSegment(value: 'sales', label: Text('Sales')),
-                    ButtonSegment(value: 'products', label: Text('Products')),
-                    ButtonSegment(value: 'profit', label: Text('Profit')),
+                    ButtonSegment(
+                      value: 'sales',
+                      label: Text('Sales'),
+                      icon: Icon(Icons.receipt, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: 'products',
+                      label: Text('Products'),
+                      icon: Icon(Icons.inventory_2, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: 'profit',
+                      label: Text('Profit'),
+                      icon: Icon(Icons.trending_up, size: 16),
+                    ),
                   ],
                   selected: {_selectedReport},
                   onSelectionChanged: (Set<String> newSelection) {
@@ -227,6 +425,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       _loadSaleItemsForProfitReport();
                     }
                   },
+                  style: SegmentedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  ),
                 ),
               ],
             ),
@@ -240,24 +441,32 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.assessment_outlined,
-                              size: 64,
-                              color: Colors.grey.shade300,
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.assessment_outlined,
+                                size: 64,
+                                color: Colors.grey.shade400,
+                              ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 24),
                             Text(
                               'No sales data found',
                               style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey.shade600,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Try selecting a different date range',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 14,
                                 color: Colors.grey.shade500,
                               ),
                             ),
@@ -342,11 +551,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildSummaryCard(
-            'Total Discount',
-            'TK ${totalDiscount.toStringAsFixed(2)}',
-            Icons.discount,
-            Colors.red,
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryCard(
+                  'Total Discount',
+                  'TK ${totalDiscount.toStringAsFixed(2)}',
+                  Icons.discount,
+                  Colors.red,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -468,13 +683,37 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withOpacity(0.15),
+            color.withOpacity(0.08),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 32),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -483,17 +722,20 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade700,
+                    letterSpacing: 0.2,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: color,
+                    letterSpacing: -0.5,
                   ),
                 ),
               ],

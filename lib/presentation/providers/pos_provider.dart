@@ -35,9 +35,11 @@ class PosState {
     this.paymentMethod = AppConstants.paymentCash,
   });
 
-  // Subtotal before discounts (sum of all item subtotals)
+  // Subtotal before overall discount (sum of all item subtotals after individual item discounts)
+  // This includes individual item discounts but not the overall discount
   double get subtotal {
-    return cartItems.fold(0.0, (sum, item) => sum + item.subtotal);
+    // Sum of (item subtotal - item discount) for each item
+    return cartItems.fold(0.0, (sum, item) => sum + (item.subtotal - item.discount));
   }
 
   // Total tax from all items
@@ -45,24 +47,29 @@ class PosState {
     return cartItems.fold(0.0, (sum, item) => sum + item.totalTaxAmount);
   }
 
-  // Discount amount
+  // Individual item discounts total
+  double get itemDiscountsTotal {
+    return cartItems.fold(0.0, (sum, item) => sum + item.discount);
+  }
+
+  // Discount amount (overall discount only, not individual item discounts)
   double get discountAmount {
     if (discountType == DiscountType.none) return 0.0;
     if (discountType == DiscountType.fixed) {
       // Fixed amount discount (in TK)
       return discountValue;
     } else {
-      // Percentage discount on subtotal
+      // Percentage discount on subtotal (which already has individual discounts applied)
       return subtotal * (discountValue / 100);
     }
   }
 
-  // Subtotal after discount
+  // Subtotal after overall discount (individual item discounts already applied in subtotal)
   double get subtotalAfterDiscount {
     return subtotal - discountAmount;
   }
 
-  // Total amount (subtotal after discount + tax)
+  // Total amount (subtotal after overall discount + tax)
   double get totalAmount {
     return subtotalAfterDiscount + taxAmount;
   }

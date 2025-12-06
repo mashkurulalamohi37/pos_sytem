@@ -433,14 +433,27 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     );
     
     if (confirm == true && mounted) {
-      await ref.read(productProvider.notifier).deleteProduct(product.id!);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Product deleted'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      try {
+        await ref.read(productProvider.notifier).deleteProduct(product.id!);
+        // Reload products with includeInactive to match the screen's initial load
+        await ref.read(productProvider.notifier).loadProducts(includeInactive: true);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Product deleted'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting product: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }

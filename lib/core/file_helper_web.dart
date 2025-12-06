@@ -11,7 +11,16 @@ class FileHelperImpl {
     try {
       // For web, create a downloadable blob
       final bytes = utf8.encode(content);
-      final blob = html.Blob([bytes], 'application/json');
+      
+      // Determine MIME type from file extension
+      String mimeType = 'text/plain';
+      if (fileName.toLowerCase().endsWith('.csv')) {
+        mimeType = 'text/csv';
+      } else if (fileName.toLowerCase().endsWith('.json')) {
+        mimeType = 'application/json';
+      }
+      
+      final blob = html.Blob([bytes], mimeType);
       final url = html.Url.createObjectUrlFromBlob(blob);
       
       // Create and trigger download

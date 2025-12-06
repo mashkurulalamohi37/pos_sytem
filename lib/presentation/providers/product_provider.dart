@@ -92,8 +92,8 @@ class ProductNotifier extends StateNotifier<ProductState> {
   }
 
   void _applyFilters() {
-    // Start with all products
-    var filtered = List<Product>.from(state.products);
+    // Start with all products, but filter out inactive (deleted) products
+    var filtered = state.products.where((p) => p.isActive).toList();
 
     // Apply category filter only if a category is selected
     // When selectedCategoryId is null, show ALL products (no category filtering)
@@ -136,7 +136,13 @@ class ProductNotifier extends StateNotifier<ProductState> {
   Future<void> deleteProduct(int id) async {
     try {
       await _productRepository.deleteProduct(id);
-      await loadProducts();
+      // Remove the deleted product from the current state immediately
+      final updatedProducts = state.products.where((p) => p.id != id).toList();
+      state = state.copyWith(products: updatedProducts);
+      // Reapply filters to update the filtered list
+      _applyFilters();
+      // Reload products to sync with Firestore
+      await loadProducts(includeInactive: true);
     } catch (e) {
       rethrow;
     }

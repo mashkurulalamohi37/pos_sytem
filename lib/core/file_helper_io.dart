@@ -47,22 +47,48 @@ class FileHelperImpl {
       // Read file as bytes (required for Android/iOS sharing)
       final bytes = await file.readAsBytes();
       
-      // Ensure file name has .json extension
-      final jsonFileName = fileName.endsWith('.json') ? fileName : '$fileName.json';
+      // Determine file extension and MIME type based on fileName
+      String finalFileName = fileName;
+      String mimeType;
+      
+      if (fileName.toLowerCase().endsWith('.csv')) {
+        mimeType = 'text/csv';
+        finalFileName = fileName;
+      } else if (fileName.toLowerCase().endsWith('.json')) {
+        mimeType = 'application/json';
+        finalFileName = fileName;
+      } else {
+        // Default to CSV if no extension, or use the provided extension
+        if (!fileName.contains('.')) {
+          finalFileName = '$fileName.csv';
+          mimeType = 'text/csv';
+        } else {
+          // Try to detect from extension
+          final ext = fileName.split('.').last.toLowerCase();
+          if (ext == 'csv') {
+            mimeType = 'text/csv';
+          } else if (ext == 'json') {
+            mimeType = 'application/json';
+          } else {
+            mimeType = 'text/plain';
+          }
+        }
+      }
       
       // Create XFile from bytes with proper MIME type and file name
       // This is the recommended way for Android/iOS
       final xFile = XFile.fromData(
         bytes,
-        name: jsonFileName,
-        mimeType: 'application/json',
+        name: finalFileName,
+        mimeType: mimeType,
       );
       
       // Share the file using bytes
       // Include a note in the text to help users save it correctly
+      final fileType = finalFileName.endsWith('.csv') ? 'CSV' : 'JSON';
       await Share.shareXFiles(
         [xFile],
-        text: '${subject ?? 'Aronium POS Backup'}\n\nPlease save this file with the .json extension to restore it later.',
+        text: '${subject ?? 'Aronium POS Report'}\n\nPlease save this $fileType file to open it later.',
         subject: subject,
       );
       
@@ -77,10 +103,19 @@ class FileHelperImpl {
         
         if (await file.exists()) {
           final bytes = await file.readAsBytes();
+          
+          // Determine MIME type from file extension
+          String mimeType = 'text/plain';
+          if (fileName.toLowerCase().endsWith('.csv')) {
+            mimeType = 'text/csv';
+          } else if (fileName.toLowerCase().endsWith('.json')) {
+            mimeType = 'application/json';
+          }
+          
           final xFile = XFile.fromData(
             bytes,
             name: fileName,
-            mimeType: 'application/json',
+            mimeType: mimeType,
           );
           
           await Share.shareXFiles(

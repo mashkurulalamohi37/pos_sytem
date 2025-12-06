@@ -325,24 +325,44 @@ class DirectCartScreen extends ConsumerWidget {
                         'Overall Discount',
                         style: TextStyle(fontSize: 14),
                       ),
-                      // Add button
-                      GestureDetector(
-                        onTap: () {
-                          _showOverallDiscountDialog(context, ref);
-                        },
-                        child: const Row(
-                          children: [
-                            Icon(Icons.add, size: 14, color: Colors.blue),
-                            Text(
-                              ' Add',
-                              style: TextStyle(
-                                color: Colors.blue,
-                                fontSize: 14,
+                      // Show discount amount if applied, otherwise show Add button
+                      posState.discountAmount > 0
+                          ? GestureDetector(
+                              onTap: () {
+                                _showOverallDiscountDialog(context, ref);
+                              },
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'TK ${posState.discountAmount.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      color: Colors.red.shade700,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.edit, size: 14, color: Colors.blue),
+                                ],
+                              ),
+                            )
+                          : GestureDetector(
+                              onTap: () {
+                                _showOverallDiscountDialog(context, ref);
+                              },
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.add, size: 14, color: Colors.blue),
+                                  Text(
+                                    ' Add',
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -775,7 +795,7 @@ class CartItemWidget extends ConsumerWidget {
         children: [
           // Main cart item container
           Container(
-            height: 50,
+            height: kIsWeb ? 50 : 55,
             decoration: BoxDecoration(
               color: const Color(0xFFE6F2FF),
               borderRadius: BorderRadius.circular(6),
@@ -783,7 +803,7 @@ class CartItemWidget extends ConsumerWidget {
             child: Row(
               children: [
                 // Left section with icon and product info
-                Flexible(
+                Expanded(
                   flex: 3,
                   child: Padding(
                     padding: EdgeInsets.symmetric(
@@ -808,39 +828,39 @@ class CartItemWidget extends ConsumerWidget {
                         ),
                         SizedBox(width: kIsWeb ? 6 : 8),
                         
-                        // Product Info - Name, price, and tax info
+                        // Product Info - Name and price
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
+                          child: Row(
                             children: [
-                              Text(
-                                item.product.name,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: kIsWeb ? 14 : 16,
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      item.product.name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: kIsWeb ? 14 : 16,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'TK ${item.unitPrice.toStringAsFixed(2)} × ${item.quantity}',
+                                      style: TextStyle(
+                                        fontSize: kIsWeb ? 11 : 12,
+                                        color: Colors.grey.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      overflow: TextOverflow.visible,
+                                      maxLines: 1,
+                                    ),
+                                  ],
                                 ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'TK ${item.unitPrice.toStringAsFixed(2)} × ${item.quantity}',
-                                style: TextStyle(
-                                  fontSize: kIsWeb ? 10 : 11,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                              if (item.taxRates.isNotEmpty)
-                                Text(
-                                  'Tax: TK ${item.totalTaxAmount.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: Colors.blue.shade700,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
                             ],
                           ),
                         ),
@@ -849,12 +869,11 @@ class CartItemWidget extends ConsumerWidget {
                   ),
                 ),
                 
-                // Price display - Flexible for web
-                Flexible(
-                  flex: 1,
-                  child: Container(
-                    alignment: Alignment.centerRight,
-                    margin: EdgeInsets.only(right: kIsWeb ? 4 : 8),
+                // Price display - Fixed width to ensure visibility
+                Padding(
+                  padding: EdgeInsets.only(right: kIsWeb ? 4 : 8),
+                  child: SizedBox(
+                    width: kIsWeb ? 75 : 85,
                     child: Text(
                       'TK ${(item.unitPrice * item.quantity - item.discount).toStringAsFixed(2)}',
                       style: TextStyle(
@@ -862,7 +881,9 @@ class CartItemWidget extends ConsumerWidget {
                         fontSize: kIsWeb ? 14 : 16,
                         color: Colors.blue,
                       ),
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.visible,
+                      maxLines: 1,
+                      textAlign: TextAlign.right,
                     ),
                   ),
                 ),
@@ -1010,31 +1031,52 @@ class CartItemWidget extends ConsumerWidget {
             ),
           ),
           
-          // Add discount button as a separate element
+          // Discount button or discount display
           Padding(
-            padding: const EdgeInsets.only(left: 44, top: 2, bottom: 4),
-            child: TextButton(
-              onPressed: () {
-                print('Discount button tapped for ${item.product.name}');
-                _applyItemDiscount(context, ref, item);
-              },
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                minimumSize: const Size(0, 0),
-                backgroundColor: Colors.blue.withOpacity(0.05),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              child: const Text(
-                'ADD DISCOUNT',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.blue,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+            padding: EdgeInsets.only(left: kIsWeb ? 42.0 : 50.0, top: 2, bottom: 4),
+            child: item.discount > 0
+                ? TextButton(
+                    onPressed: () {
+                      _applyItemDiscount(context, ref, item);
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: const Size(0, 0),
+                      backgroundColor: Colors.red.withOpacity(0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    child: Text(
+                      'DISCOUNT: TK ${item.discount.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: kIsWeb ? 10 : 11,
+                        color: Colors.red.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  )
+                : TextButton(
+                    onPressed: () {
+                      _applyItemDiscount(context, ref, item);
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: const Size(0, 0),
+                      backgroundColor: Colors.blue.withOpacity(0.05),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    child: Text(
+                      'ADD DISCOUNT',
+                      style: TextStyle(
+                        fontSize: kIsWeb ? 10 : 12,
+                        color: Colors.blue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
