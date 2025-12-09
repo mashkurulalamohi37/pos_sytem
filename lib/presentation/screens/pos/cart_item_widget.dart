@@ -66,6 +66,7 @@ class CartItemWidget extends StatelessWidget {
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
                             fontSize: kIsWeb ? 13 : 14,
+                            color: Colors.black87,
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
@@ -81,7 +82,7 @@ class CartItemWidget extends StatelessWidget {
                                 'TK ${item.unitPrice.toStringAsFixed(2)} × ${item.quantity}',
                                 style: TextStyle(
                                   fontSize: kIsWeb ? 10 : 12,
-                                  color: Colors.grey.shade700,
+                                  color: Colors.black54,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
