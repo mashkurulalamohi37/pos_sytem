@@ -554,6 +554,21 @@ class _AnimatedMenuCardState extends State<_AnimatedMenuCard> with SingleTickerP
     _controller.dispose();
     super.dispose();
   }
+
+  Color _getTextColor(Color baseColor) {
+    // Create a darker, more visible version of the color
+    // For light colors like amber/yellow, make it much darker
+    final hsl = HSLColor.fromColor(baseColor);
+    final lightness = hsl.lightness;
+    
+    // If the color is light (like amber/yellow), make it much darker
+    if (lightness > 0.6) {
+      return hsl.withLightness(0.3).withSaturation(0.8).toColor();
+    } else {
+      // For darker colors, make them slightly darker for better contrast
+      return hsl.withLightness((hsl.lightness * 0.7).clamp(0.2, 0.5)).toColor();
+    }
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -631,15 +646,26 @@ class _AnimatedMenuCardState extends State<_AnimatedMenuCard> with SingleTickerP
                           ),
                         ),
                         const SizedBox(height: 18),
-                        AnimatedDefaultTextStyle(
-                          duration: const Duration(milliseconds: 200),
-                          style: TextStyle(
-                            fontSize: _isHovered ? 20 : 18,
-                            fontWeight: FontWeight.w600,
-                            color: widget.color.withBlue(widget.color.blue - 10).withRed(widget.color.red - 10),
-                            letterSpacing: 0.5,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 200),
+                            style: TextStyle(
+                              fontSize: _isHovered ? 20 : 18,
+                              fontWeight: FontWeight.w600,
+                              color: _getTextColor(widget.color),
+                              letterSpacing: 0.5,
+                            ),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                widget.title,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ),
-                          child: Text(widget.title),
                         ),
                       ],
                     ),

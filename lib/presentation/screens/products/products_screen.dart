@@ -217,6 +217,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   }
 
   Widget _buildProductCard(Product product, bool canEdit) {
+    // Check if running on web for enhanced buttons
+    final isWeb = MediaQuery.of(context).size.width > 600;
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 1,
@@ -224,7 +227,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: InkWell(
-        onTap: canEdit
+        onTap: canEdit && !isWeb
             ? () {
                 Navigator.push(
                   context,
@@ -236,13 +239,13 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             : null,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: [
               // Product Icon
               Container(
-                width: 40,
-                height: 40,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: product.isLowStock
                       ? Colors.blue.shade100
@@ -252,10 +255,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 child: Icon(
                   Icons.inventory_2,
                   color: Colors.blue,
-                  size: 24,
+                  size: 28,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               
               // Product Info
               Expanded(
@@ -265,18 +268,36 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     Text(
                       product.name,
                       style: const TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Stock: ${product.stockQuantity}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: product.isLowStock ? Colors.green : Colors.green,
-                      ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: product.isLowStock 
+                                ? Colors.orange.shade50 
+                                : Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: product.isLowStock 
+                                  ? Colors.orange.shade200 
+                                  : Colors.green.shade200,
+                            ),
+                          ),
+                          child: Text(
+                            'Stock: ${product.stockQuantity}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: product.isLowStock ? Colors.orange.shade700 : Colors.green.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -289,52 +310,130 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                   Text(
                     'TK ${product.sellingPrice.toStringAsFixed(2)}',
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.blue,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     'Cost: TK ${product.costPrice.toStringAsFixed(2)}',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       color: Colors.grey.shade600,
                     ),
                   ),
-                  if (canEdit) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 16, color: Colors.blue),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ProductFormScreen(product: product),
+                  if (canEdit) ...[ 
+                    const SizedBox(height: 12),
+                    // Enhanced buttons for web, compact for mobile
+                    isWeb 
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Edit Button - Enhanced for Web
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ProductFormScreen(product: product),
+                                      ),
+                                    ).then((_) => ref.read(productProvider.notifier).loadProducts(includeInactive: true));
+                                  },
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.blue.shade200),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.edit, size: 16, color: Colors.blue.shade700),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Edit',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.blue.shade700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ).then((_) => ref.read(productProvider.notifier).loadProducts(includeInactive: true));
-                          },
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 24,
-                            minHeight: 24,
+                              const SizedBox(width: 8),
+                              // Delete Button - Enhanced for Web
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () => _confirmDelete(product),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade50,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.red.shade200),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.delete, size: 16, color: Colors.red.shade700),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Delete',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.red.shade700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit, size: 18, color: Colors.blue),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ProductFormScreen(product: product),
+                                    ),
+                                  ).then((_) => ref.read(productProvider.notifier).loadProducts(includeInactive: true));
+                                },
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
+                                tooltip: 'Edit',
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                                onPressed: () => _confirmDelete(product),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
+                                tooltip: 'Delete',
+                              ),
+                            ],
                           ),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, size: 16, color: Colors.red),
-                          onPressed: () => _confirmDelete(product),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 24,
-                            minHeight: 24,
-                          ),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ],
-                    ),
                   ],
                 ],
               ),

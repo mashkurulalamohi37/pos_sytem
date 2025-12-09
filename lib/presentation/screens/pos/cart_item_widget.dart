@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:ui' show SystemMouseCursors;
 import 'cart_item.dart';
 import '../../widgets/discount_dialog.dart';
 import '../../providers/pos_provider.dart';
@@ -85,17 +86,140 @@ class CartItemWidget extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            GestureDetector(
-                              onTap: () => _showDiscountDialog(context),
-                              child: Text(
-                                'Add discount',
-                                style: TextStyle(
-                                  fontSize: kIsWeb ? 10 : 12,
-                                  color: Colors.blue,
-                                  decoration: TextDecoration.underline,
+                            // Show discount if applied, otherwise show "Add discount"
+                            if (item.discount > 0)
+                              if (kIsWeb)
+                                StatefulBuilder(
+                                  builder: (context, setState) {
+                                    bool isHovered = false;
+                                    return MouseRegion(
+                                      cursor: SystemMouseCursors.click,
+                                      onEnter: (_) => setState(() => isHovered = true),
+                                      onExit: (_) => setState(() => isHovered = false),
+                                      child: GestureDetector(
+                                        onTap: () => _showDiscountDialog(context),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 150),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isHovered ? Colors.red.shade100 : Colors.red.shade50,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(
+                                              color: isHovered ? Colors.red.shade400 : Colors.red.shade200,
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.discount,
+                                                size: 12,
+                                                color: Colors.red.shade700,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Discount: TK ${item.discount.toStringAsFixed(2)}',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.red.shade700,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                )
+                              else
+                                GestureDetector(
+                                  onTap: () => _showDiscountDialog(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.red.shade200),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.discount,
+                                          size: 12,
+                                          color: Colors.red.shade700,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Discount: TK ${item.discount.toStringAsFixed(2)}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.red.shade700,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                            else
+                              if (kIsWeb)
+                                StatefulBuilder(
+                                  builder: (context, setState) {
+                                    bool isHovered = false;
+                                    return MouseRegion(
+                                      cursor: SystemMouseCursors.click,
+                                      onEnter: (_) => setState(() => isHovered = true),
+                                      onExit: (_) => setState(() => isHovered = false),
+                                      child: GestureDetector(
+                                        onTap: () => _showDiscountDialog(context),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 150),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isHovered ? Colors.blue.shade50 : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: isHovered
+                                                ? Border.all(
+                                                    color: Colors.blue.shade300,
+                                                    width: 1,
+                                                  )
+                                                : null,
+                                          ),
+                                          child: Text(
+                                            'Add discount',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: isHovered ? Colors.blue.shade700 : Colors.blue,
+                                              decoration: TextDecoration.underline,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                )
+                              else
+                                GestureDetector(
+                                  onTap: () => _showDiscountDialog(context),
+                                  child: Text(
+                                    'Add discount',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
                           ],
                         ),
                       ],
@@ -194,69 +318,150 @@ class CartItemWidget extends StatelessWidget {
               ],
             ),
           ] else ...[
-            // Web: More compact controls
+            // Web: Enhanced larger controls with hover effects
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Center(
-                    child: IconButton(
-                      icon: const Icon(Icons.remove, size: 10),
-                      onPressed: () {
-                        if (item.quantity > 1) {
-                          onQuantityChanged(item.product.id!, item.quantity - 1);
-                        }
-                      },
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
+                // Minus button with hover
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: StatefulBuilder(
+                    builder: (context, setState) {
+                      bool isHovered = false;
+                      return GestureDetector(
+                        onTap: () {
+                          if (item.quantity > 1) {
+                            onQuantityChanged(item.product.id!, item.quantity - 1);
+                          }
+                        },
+                        child: MouseRegion(
+                          onEnter: (_) => setState(() => isHovered = true),
+                          onExit: (_) => setState(() => isHovered = false),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: isHovered ? Colors.grey.shade200 : Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isHovered ? Colors.grey.shade400 : Colors.grey.shade300,
+                                width: isHovered ? 1.5 : 1,
+                              ),
+                              boxShadow: isHovered
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : [],
+                            ),
+                            child: const Icon(
+                              Icons.remove,
+                              size: 18,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
                 SizedBox(
-                  width: 18,
+                  width: 32,
                   child: Center(
                     child: Text(
                       '${item.quantity}',
                       style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ),
-                Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade100,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Center(
-                    child: IconButton(
-                      icon: const Icon(Icons.add, size: 10),
-                      onPressed: () {
-                        onQuantityChanged(item.product.id!, item.quantity + 1);
-                      },
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
+                // Plus button with hover
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: StatefulBuilder(
+                    builder: (context, setState) {
+                      bool isHovered = false;
+                      return GestureDetector(
+                        onTap: () {
+                          onQuantityChanged(item.product.id!, item.quantity + 1);
+                        },
+                        child: MouseRegion(
+                          onEnter: (_) => setState(() => isHovered = true),
+                          onExit: (_) => setState(() => isHovered = false),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: isHovered ? Colors.blue.shade200 : Colors.blue.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isHovered ? Colors.blue.shade400 : Colors.blue.shade300,
+                                width: isHovered ? 1.5 : 1,
+                              ),
+                              boxShadow: isHovered
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.blue.withOpacity(0.3),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : [],
+                            ),
+                            child: const Icon(
+                              Icons.add,
+                              size: 18,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
-                const SizedBox(width: 2),
-                GestureDetector(
-                  onTap: () {
-                    onRemove(item.product.id!);
-                  },
-                  child: const Icon(
-                    Icons.delete_outline,
-                    color: Colors.red,
-                    size: 14,
+                const SizedBox(width: 8),
+                // Delete button with hover
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: StatefulBuilder(
+                    builder: (context, setState) {
+                      bool isHovered = false;
+                      return GestureDetector(
+                        onTap: () {
+                          onRemove(item.product.id!);
+                        },
+                        child: MouseRegion(
+                          onEnter: (_) => setState(() => isHovered = true),
+                          onExit: (_) => setState(() => isHovered = false),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: isHovered ? Colors.red.shade50 : Colors.transparent,
+                              borderRadius: BorderRadius.circular(6),
+                              border: isHovered
+                                  ? Border.all(
+                                      color: Colors.red.shade300,
+                                      width: 1.5,
+                                    )
+                                  : null,
+                            ),
+                            child: Icon(
+                              Icons.delete_outline,
+                              color: isHovered ? Colors.red.shade700 : Colors.red,
+                              size: isHovered ? 22 : 20,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],

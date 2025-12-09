@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../domain/entities/product.dart';
 import 'cart_item.dart';
 
@@ -59,15 +60,23 @@ class ProductGridSection extends StatelessWidget {
     final activeProducts = products.where((p) => p.isActive).toList();
     
     // Responsive grid based on screen size
-    final crossAxisCount = MediaQuery.of(context).size.width > 1200 ? 6 : 
-                          MediaQuery.of(context).size.width > 900 ? 5 : 
-                          MediaQuery.of(context).size.width > 600 ? 4 : 3;
+    // For web, show more columns to make cards smaller
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = kIsWeb 
+        ? (screenWidth > 1200 ? 8 : screenWidth > 900 ? 7 : 6)
+        : (screenWidth > 1200 ? 6 : 
+           screenWidth > 900 ? 5 : 
+           screenWidth > 600 ? 4 : 3);
+    
+    // For web, use a larger aspect ratio to make cards more compact
+    // Adjusted to accommodate product description - increased for mobile to prevent overflow
+    final childAspectRatio = kIsWeb ? 0.70 : 0.65;
     
     return GridView.builder(
       padding: const EdgeInsets.all(12),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
-        childAspectRatio: 0.62, // Further reduced to prevent overflow
+        childAspectRatio: childAspectRatio,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -128,20 +137,22 @@ class ProductGridSection extends StatelessWidget {
                 color: isOutOfStock ? Colors.grey.shade100 : null,
               ),
               child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Icon section with fixed height - reduced
-                    SizedBox(
-                      height: 65,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
+                padding: EdgeInsets.all(kIsWeb ? 6.0 : 5.0),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Icon section with fixed height - reduced to prevent overflow
+                        SizedBox(
+                          height: kIsWeb ? 50 : 50,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
                           Center(
                             child: Container(
-                              padding: const EdgeInsets.all(10),
+                              padding: EdgeInsets.all(kIsWeb ? 8 : 10),
                               decoration: BoxDecoration(
                                 color: isOutOfStock
                                     ? Colors.grey.shade200
@@ -164,74 +175,105 @@ class ProductGridSection extends StatelessWidget {
                               ),
                               child: Icon(
                                 Icons.inventory_2,
-                                size: 28,
+                                size: kIsWeb ? 22 : 24,
                                 color: isOutOfStock
                                     ? Colors.grey.shade400
                                     : isLowStock
                                         ? Colors.orange.shade700
                                         : Theme.of(context).colorScheme.primary,
                               ),
+                              ),
                             ),
-                          ),
-                          // Cart quantity badge
-                          if (isInCart)
-                            Positioned(
-                              top: -2,
-                              right: -2,
-                              child: Container(
-                                padding: const EdgeInsets.all(2.5),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 1.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.15),
-                                      blurRadius: 2,
-                                      offset: const Offset(0, 1),
+                            // Cart quantity badge
+                            if (isInCart)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2.5),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 1.5,
                                     ),
-                                  ],
-                                ),
-                                child: Text(
-                                  '$cartQuantity',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.bold,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.15),
+                                        blurRadius: 2,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    '$cartQuantity',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    // Product name - constrained height
-                    SizedBox(
-                      height: 28,
-                      child: Center(
-                        child: Text(
-                          product.name,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            color: isOutOfStock ? Colors.grey.shade600 : Colors.black87,
-                            height: 1.1,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    // Price - fixed height
-                    Container(
-                      height: 20,
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        const Spacer(flex: 1),
+                        SizedBox(height: kIsWeb ? 2 : 1),
+                        // Product name - constrained height
+                        SizedBox(
+                          height: kIsWeb ? 18 : 20,
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: kIsWeb ? 1 : 2),
+                            child: Text(
+                              product.name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: kIsWeb ? 10 : 10,
+                                color: isOutOfStock ? Colors.grey.shade600 : Colors.black87,
+                                height: 1.0,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                        // Product description - only show if there's space, reduced height
+                        if (product.description != null && product.description!.isNotEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(
+                              top: kIsWeb ? 1 : 1,
+                              left: kIsWeb ? 2 : 2,
+                              right: kIsWeb ? 2 : 2,
+                            ),
+                            child: SizedBox(
+                              height: kIsWeb ? 14 : 16,
+                              child: Text(
+                                product.description!,
+                                style: TextStyle(
+                                  fontSize: kIsWeb ? 7 : 8,
+                                  color: Colors.grey.shade600,
+                                  height: 1.0,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        SizedBox(height: kIsWeb ? 2 : 2),
+                        // Price - fixed height, smaller padding
+                        Container(
+                      constraints: BoxConstraints(
+                        minHeight: kIsWeb ? 16 : 18,
+                        maxHeight: kIsWeb ? 18 : 20,
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: kIsWeb ? 3 : 3, 
+                        vertical: kIsWeb ? 1 : 1.5,
+                      ),
                       decoration: BoxDecoration(
                         color: isOutOfStock
                             ? Colors.grey.shade200
@@ -240,24 +282,30 @@ class ProductGridSection extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          'TK ${product.sellingPrice.toStringAsFixed(2)}',
+                          'TK ${product.sellingPrice.toStringAsFixed(2)}${product.unit.isNotEmpty && product.unit != 'pcs' ? ' / ${product.unit}' : ''}',
                           style: TextStyle(
                             color: isOutOfStock
                                 ? Colors.grey.shade600
                                 : Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.bold,
-                            fontSize: 11,
+                            fontSize: kIsWeb ? 10 : 10,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    // Stock quantity - fixed height
-                    Container(
-                      height: 16,
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                        SizedBox(height: kIsWeb ? 1 : 1.5),
+                        // Stock quantity with unit - fixed height, smaller
+                        Container(
+                      constraints: BoxConstraints(
+                        minHeight: kIsWeb ? 12 : 14,
+                        maxHeight: kIsWeb ? 14 : 16,
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: kIsWeb ? 2 : 2, 
+                        vertical: kIsWeb ? 0.5 : 0.5,
+                      ),
                       decoration: BoxDecoration(
                         color: isOutOfStock
                             ? Colors.red.shade50
@@ -270,9 +318,9 @@ class ProductGridSection extends StatelessWidget {
                         child: Text(
                           isOutOfStock
                               ? 'Out'
-                              : 'Stock: ${product.stockQuantity}',
+                              : 'Stock: ${product.stockQuantity} ${product.unit}',
                           style: TextStyle(
-                            fontSize: 8,
+                            fontSize: kIsWeb ? 7 : 7,
                             fontWeight: FontWeight.w600,
                             color: isOutOfStock
                                 ? Colors.red.shade700
@@ -285,7 +333,9 @@ class ProductGridSection extends StatelessWidget {
                         ),
                       ),
                     ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
               ),
             ),

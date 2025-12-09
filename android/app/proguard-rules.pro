@@ -13,6 +13,18 @@
 -dontwarn com.google.firebase.**
 -dontwarn com.google.android.gms.**
 
+# ML Kit for barcode scanning
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.common.internal.safeparcel.SafeParcelable { *; }
+-keepnames class com.google.mlkit.vision.barcode.common.Barcode
+-dontwarn com.google.mlkit.**
+
+# Mobile Scanner Plugin
+-keep class dev.steenbakker.mobile_scanner.** { *; }
+-keep class androidx.camera.** { *; }
+-dontwarn dev.steenbakker.mobile_scanner.**
+-dontwarn androidx.camera.**
+
 # Play Core Library
 -keep class com.google.android.play.core.** { *; }
 -dontwarn com.google.android.play.core.**

@@ -297,388 +297,951 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(productProvider).categories;
+    final isWeb = MediaQuery.of(context).size.width > 900;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.product == null ? 'Add Product' : 'Edit Product'),
         elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.grey.shade900,
       ),
+      backgroundColor: isWeb ? Colors.grey.shade50 : Colors.white,
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Product Name
-            TextFormField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: 'Product Name *',
-                prefixIcon: const Icon(Icons.inventory_2),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter product name';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            // SKU and Barcode
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _skuController,
-                    decoration: InputDecoration(
-                      labelText: 'SKU',
-                      prefixIcon: const Icon(Icons.qr_code),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: _generateSku,
-                        tooltip: 'Generate SKU',
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
+        child: isWeb ? _buildWebLayout(categories) : _buildMobileLayout(categories),
+      ),
+    );
+  }
+
+  Widget _buildWebLayout(List<Category> categories) {
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 1200),
+        padding: const EdgeInsets.all(32),
+        child: Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ListView(
+            padding: const EdgeInsets.all(32),
+            children: [
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    validator: (value) {
-                      if (value != null && value.isNotEmpty) {
-                        // SKU validation will be done asynchronously in _saveProduct
-                        if (value.contains(' ')) {
-                          return 'SKU should not contain spaces';
-                        }
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _barcodeController,
-                    decoration: InputDecoration(
-                      labelText: 'Barcode',
-                      prefixIcon: const Icon(Icons.qr_code_scanner),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.qr_code_scanner),
-                        onPressed: () => _scanBarcode(context),
-                        tooltip: 'Scan Barcode',
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
+                    child: Icon(
+                      Icons.inventory_2,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 32,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Category (with hierarchical display)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: DropdownButtonFormField<int?>(
-                value: _selectedCategoryId,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: InputBorder.none,
-                ),
-                items: [
-                  const DropdownMenuItem<int?>(
-                    value: null,
-                    child: Text('No Category'),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.product == null ? 'Add New Product' : 'Edit Product',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Fill in the product details below',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ),
-                  ..._buildCategoryItems(categories),
                 ],
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategoryId = value;
-                  });
+              ),
+              const SizedBox(height: 32),
+              const Divider(),
+              const SizedBox(height: 24),
+
+              // Basic Information Section
+              _buildSectionHeader('Basic Information', Icons.info_outline),
+              const SizedBox(height: 16),
+              
+              // Product Name (Full Width)
+              TextFormField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: 'Product Name *',
+                  hintText: 'Enter product name',
+                  prefixIcon: const Icon(Icons.inventory_2),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                ),
+                style: const TextStyle(fontSize: 16),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter product name';
+                  }
+                  return null;
                 },
               ),
-            ),
-            const SizedBox(height: 16),
-            // Prices
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _costPriceController,
-                    decoration: InputDecoration(
-                      labelText: 'Cost Price *',
-                      prefixIcon: const Icon(Icons.attach_money),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 20),
+
+              // SKU and Barcode Row
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _skuController,
+                      decoration: InputDecoration(
+                        labelText: 'SKU',
+                        hintText: 'Product SKU',
+                        prefixIcon: const Icon(Icons.qr_code),
+                        suffixIcon: Tooltip(
+                          message: 'Generate SKU',
+                          child: IconButton(
+                            icon: const Icon(Icons.refresh),
+                            onPressed: _generateSku,
+                          ),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                       ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
+                      style: const TextStyle(fontSize: 16),
+                      validator: (value) {
+                        if (value != null && value.isNotEmpty) {
+                          if (value.contains(' ')) {
+                            return 'SKU should not contain spaces';
+                          }
+                        }
+                        return null;
+                      },
                     ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      if (double.tryParse(value) == null) {
-                        return 'Invalid number';
-                      }
-                      return null;
-                    },
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _sellingPriceController,
-                    decoration: InputDecoration(
-                      labelText: 'Selling Price *',
-                      prefixIcon: const Icon(Icons.sell),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _barcodeController,
+                      decoration: InputDecoration(
+                        labelText: 'Barcode',
+                        hintText: 'Product barcode',
+                        prefixIcon: const Icon(Icons.qr_code_scanner),
+                        suffixIcon: Tooltip(
+                          message: 'Scan Barcode',
+                          child: IconButton(
+                            icon: const Icon(Icons.qr_code_scanner),
+                            onPressed: () => _scanBarcode(context),
+                          ),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                       ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
+                      style: const TextStyle(fontSize: 16),
                     ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      if (double.tryParse(value) == null) {
-                        return 'Invalid number';
-                      }
-                      return null;
-                    },
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Stock
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _stockController,
-                    decoration: InputDecoration(
-                      labelText: 'Stock Quantity *',
-                      prefixIcon: const Icon(Icons.inventory),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      if (int.tryParse(value) == null) {
-                        return 'Invalid number';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _lowStockThresholdController,
-                    decoration: InputDecoration(
-                      labelText: 'Low Stock Threshold',
-                      prefixIcon: const Icon(Icons.warning),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      if (int.tryParse(value) == null) {
-                        return 'Invalid number';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Unit
-            TextFormField(
-              controller: _unitController,
-              decoration: InputDecoration(
-                labelText: 'Unit (pcs, kg, etc.)',
-                prefixIcon: const Icon(Icons.straighten),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade50,
+                ],
               ),
-            ),
-            const SizedBox(height: 16),
-            // Description
-            TextFormField(
-              controller: _descriptionController,
-              decoration: InputDecoration(
-                labelText: 'Description',
-                prefixIcon: const Icon(Icons.description),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 16),
-            // Tax Rates Selection
-            Consumer(
-              builder: (context, ref, child) {
-                final taxRateState = ref.watch(taxRateProvider);
-                return Card(
-                  child: ExpansionTile(
-                    leading: const Icon(Icons.receipt_long),
-                    title: const Text('Tax Rates'),
-                    subtitle: Text(
-                      _selectedTaxRateIds.isEmpty
-                          ? 'No tax rates selected'
-                          : '${_selectedTaxRateIds.length} tax rate(s) selected',
+              const SizedBox(height: 20),
+
+              // Category and Unit Row
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: DropdownButtonFormField<int?>(
+                        value: _selectedCategoryId,
+                        decoration: const InputDecoration(
+                          labelText: 'Category',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 20),
+                        ),
+                        style: const TextStyle(fontSize: 16, color: Colors.black87),
+                        items: [
+                          const DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text('No Category'),
+                          ),
+                          ..._buildCategoryItems(categories),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedCategoryId = value;
+                          });
+                        },
+                      ),
                     ),
-                    children: [
-                      if (taxRateState.isLoading)
-                        const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      else if (taxRateState.taxRates.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _unitController,
+                      decoration: InputDecoration(
+                        labelText: 'Unit',
+                        hintText: 'pcs, kg, liter, etc.',
+                        prefixIcon: const Icon(Icons.straighten),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      ),
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              // Pricing Section
+              _buildSectionHeader('Pricing', Icons.attach_money),
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _costPriceController,
+                      decoration: InputDecoration(
+                        labelText: 'Cost Price *',
+                        hintText: '0.00',
+                        prefixIcon: const Icon(Icons.attach_money),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      ),
+                      style: const TextStyle(fontSize: 16),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (double.tryParse(value) == null) {
+                          return 'Invalid number';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _sellingPriceController,
+                      decoration: InputDecoration(
+                        labelText: 'Selling Price *',
+                        hintText: '0.00',
+                        prefixIcon: const Icon(Icons.sell),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      ),
+                      style: const TextStyle(fontSize: 16),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (double.tryParse(value) == null) {
+                          return 'Invalid number';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              // Inventory Section
+              _buildSectionHeader('Inventory', Icons.inventory),
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _stockController,
+                      decoration: InputDecoration(
+                        labelText: 'Stock Quantity *',
+                        hintText: '0',
+                        prefixIcon: const Icon(Icons.inventory),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      ),
+                      style: const TextStyle(fontSize: 16),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (int.tryParse(value) == null) {
+                          return 'Invalid number';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _lowStockThresholdController,
+                      decoration: InputDecoration(
+                        labelText: 'Low Stock Threshold',
+                        hintText: '10',
+                        prefixIcon: const Icon(Icons.warning),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      ),
+                      style: const TextStyle(fontSize: 16),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        if (int.tryParse(value) == null) {
+                          return 'Invalid number';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              // Additional Information Section
+              _buildSectionHeader('Additional Information', Icons.description),
+              const SizedBox(height: 16),
+              
+              TextFormField(
+                controller: _descriptionController,
+                decoration: InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'Enter product description (optional)',
+                  prefixIcon: const Icon(Icons.description),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                ),
+                style: const TextStyle(fontSize: 16),
+                maxLines: 4,
+              ),
+              const SizedBox(height: 32),
+
+              // Tax Configuration Section
+              _buildSectionHeader('Tax Configuration', Icons.receipt_long),
+              const SizedBox(height: 16),
+              
+              Consumer(
+                builder: (context, ref, child) {
+                  final taxRateState = ref.watch(taxRateProvider);
+                  return Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    child: ExpansionTile(
+                      leading: const Icon(Icons.receipt_long),
+                      title: const Text('Tax Rates', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                      subtitle: Text(
+                        _selectedTaxRateIds.isEmpty
+                            ? 'No tax rates selected'
+                            : '${_selectedTaxRateIds.length} tax rate(s) selected',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      children: [
+                        if (taxRateState.isLoading)
+                          const Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (taxRateState.taxRates.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'No tax rates available',
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                                const SizedBox(height: 8),
+                                TextButton.icon(
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Create Tax Rate'),
+                                  onPressed: () {
+                                    Navigator.pushNamed(context, '/tax-rates');
+                                  },
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          ...taxRateState.taxRates.map((taxRate) {
+                            final isSelected = _selectedTaxRateIds.contains(taxRate.id);
+                            return CheckboxListTile(
+                              title: Text(taxRate.name, style: const TextStyle(fontSize: 15)),
+                              subtitle: Text('${taxRate.rate.toStringAsFixed(2)}%'),
+                              value: isSelected,
+                              onChanged: (value) {
+                                setState(() {
+                                  if (value == true) {
+                                    if (taxRate.id != null) {
+                                      _selectedTaxRateIds.add(taxRate.id!);
+                                    }
+                                  } else {
+                                    _selectedTaxRateIds.remove(taxRate.id);
+                                  }
+                                });
+                              },
+                            );
+                          }),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.shade300),
+                ),
+                child: SwitchListTile(
+                  title: const Text('Price Includes Tax', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  subtitle: const Text('Selling price already includes tax', style: TextStyle(fontSize: 14)),
+                  value: _priceIncludesTax,
+                  onChanged: (value) {
+                    setState(() {
+                      _priceIncludesTax = value;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Product Status Section
+              _buildSectionHeader('Product Status', Icons.toggle_on),
+              const SizedBox(height: 16),
+              
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.shade300),
+                ),
+                child: SwitchListTile(
+                  title: const Text('Active', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  subtitle: const Text('Product will be visible in POS', style: TextStyle(fontSize: 14)),
+                  value: _isActive,
+                  onChanged: (value) {
+                    setState(() {
+                      _isActive = value;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Action Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _saveProduct,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
+                              const Icon(Icons.save, size: 20),
+                              const SizedBox(width: 8),
                               Text(
-                                'No tax rates available',
-                                style: TextStyle(color: Colors.grey.shade600),
-                              ),
-                              const SizedBox(height: 8),
-                              TextButton.icon(
-                                icon: const Icon(Icons.add),
-                                label: const Text('Create Tax Rate'),
-                                onPressed: () {
-                                  Navigator.pushNamed(context, '/tax-rates');
-                                },
+                                widget.product == null ? 'Add Product' : 'Save Changes',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
-                        )
-                      else
-                        ...taxRateState.taxRates.map((taxRate) {
-                          final isSelected = _selectedTaxRateIds.contains(taxRate.id);
-                          return CheckboxListTile(
-                            title: Text(taxRate.name),
-                            subtitle: Text('${taxRate.rate.toStringAsFixed(2)}%'),
-                            value: isSelected,
-                            onChanged: (value) {
-                              setState(() {
-                                if (value == true) {
-                                  if (taxRate.id != null) {
-                                    _selectedTaxRateIds.add(taxRate.id!);
-                                  }
-                                } else {
-                                  _selectedTaxRateIds.remove(taxRate.id);
-                                }
-                              });
-                            },
-                          );
-                        }),
-                    ],
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            // Price Includes Tax
-            Card(
-              child: SwitchListTile(
-                title: const Text('Price Includes Tax'),
-                subtitle: const Text('Selling price already includes tax'),
-                value: _priceIncludesTax,
-                onChanged: (value) {
-                  setState(() {
-                    _priceIncludesTax = value;
-                  });
-                },
+                ],
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(List<Category> categories) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Product Name
+        TextFormField(
+          controller: _nameController,
+          decoration: InputDecoration(
+            labelText: 'Product Name *',
+            prefixIcon: const Icon(Icons.inventory_2),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(height: 16),
-            // Active Status
-            Card(
-              child: SwitchListTile(
-                title: const Text('Active'),
-                subtitle: const Text('Product will be visible in POS'),
-                value: _isActive,
-                onChanged: (value) {
-                  setState(() {
-                    _isActive = value;
-                  });
-                },
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Save Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _saveProduct,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
+            filled: true,
+            fillColor: Colors.grey.shade50,
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter product name';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+        // SKU and Barcode
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _skuController,
+                decoration: InputDecoration(
+                  labelText: 'SKU',
+                  prefixIcon: const Icon(Icons.qr_code),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: _generateSku,
+                    tooltip: 'Generate SKU',
+                  ),
+                  border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 2,
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
                 ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(
-                        widget.product == null ? 'Add Product' : 'Save Product',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                validator: (value) {
+                  if (value != null && value.isNotEmpty) {
+                    // SKU validation will be done asynchronously in _saveProduct
+                    if (value.contains(' ')) {
+                      return 'SKU should not contain spaces';
+                    }
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _barcodeController,
+                decoration: InputDecoration(
+                  labelText: 'Barcode',
+                  prefixIcon: const Icon(Icons.qr_code_scanner),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: () => _scanBarcode(context),
+                    tooltip: 'Scan Barcode',
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
               ),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 16),
+        // Category (with hierarchical display)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: DropdownButtonFormField<int?>(
+            value: _selectedCategoryId,
+            decoration: const InputDecoration(
+              labelText: 'Category',
+              border: InputBorder.none,
+            ),
+            items: [
+              const DropdownMenuItem<int?>(
+                value: null,
+                child: Text('No Category'),
+              ),
+              ..._buildCategoryItems(categories),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _selectedCategoryId = value;
+              });
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Prices
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _costPriceController,
+                decoration: InputDecoration(
+                  labelText: 'Cost Price *',
+                  prefixIcon: const Icon(Icons.attach_money),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Required';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Invalid number';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _sellingPriceController,
+                decoration: InputDecoration(
+                  labelText: 'Selling Price *',
+                  prefixIcon: const Icon(Icons.sell),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Required';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Invalid number';
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Stock
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _stockController,
+                decoration: InputDecoration(
+                  labelText: 'Stock Quantity *',
+                  prefixIcon: const Icon(Icons.inventory),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Required';
+                  }
+                  if (int.tryParse(value) == null) {
+                    return 'Invalid number';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _lowStockThresholdController,
+                decoration: InputDecoration(
+                  labelText: 'Low Stock Threshold',
+                  prefixIcon: const Icon(Icons.warning),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Required';
+                  }
+                  if (int.tryParse(value) == null) {
+                    return 'Invalid number';
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Unit
+        TextFormField(
+          controller: _unitController,
+          decoration: InputDecoration(
+            labelText: 'Unit (pcs, kg, etc.)',
+            prefixIcon: const Icon(Icons.straighten),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: Colors.grey.shade50,
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Description
+        TextFormField(
+          controller: _descriptionController,
+          decoration: InputDecoration(
+            labelText: 'Description',
+            prefixIcon: const Icon(Icons.description),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: Colors.grey.shade50,
+          ),
+          maxLines: 3,
+        ),
+        const SizedBox(height: 16),
+        // Tax Rates Selection
+        Consumer(
+          builder: (context, ref, child) {
+            final taxRateState = ref.watch(taxRateProvider);
+            return Card(
+              child: ExpansionTile(
+                leading: const Icon(Icons.receipt_long),
+                title: const Text('Tax Rates'),
+                subtitle: Text(
+                  _selectedTaxRateIds.isEmpty
+                      ? 'No tax rates selected'
+                      : '${_selectedTaxRateIds.length} tax rate(s) selected',
+                ),
+                children: [
+                  if (taxRateState.isLoading)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (taxRateState.taxRates.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          Text(
+                            'No tax rates available',
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            icon: const Icon(Icons.add),
+                            label: const Text('Create Tax Rate'),
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/tax-rates');
+                            },
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ...taxRateState.taxRates.map((taxRate) {
+                      final isSelected = _selectedTaxRateIds.contains(taxRate.id);
+                      return CheckboxListTile(
+                        title: Text(taxRate.name),
+                        subtitle: Text('${taxRate.rate.toStringAsFixed(2)}%'),
+                        value: isSelected,
+                        onChanged: (value) {
+                          setState(() {
+                            if (value == true) {
+                              if (taxRate.id != null) {
+                                _selectedTaxRateIds.add(taxRate.id!);
+                              }
+                            } else {
+                              _selectedTaxRateIds.remove(taxRate.id);
+                            }
+                          });
+                        },
+                      );
+                    }),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+        // Price Includes Tax
+        Card(
+          child: SwitchListTile(
+            title: const Text('Price Includes Tax'),
+            subtitle: const Text('Selling price already includes tax'),
+            value: _priceIncludesTax,
+            onChanged: (value) {
+              setState(() {
+                _priceIncludesTax = value;
+              });
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Active Status
+        Card(
+          child: SwitchListTile(
+            title: const Text('Active'),
+            subtitle: const Text('Product will be visible in POS'),
+            value: _isActive,
+            onChanged: (value) {
+              setState(() {
+                _isActive = value;
+              });
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+        // Save Button
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _saveProduct,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 2,
+            ),
+            child: _isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    widget.product == null ? 'Add Product' : 'Save Product',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 24, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Divider(color: Colors.grey.shade300, thickness: 1),
+        ),
+      ],
     );
   }
 }

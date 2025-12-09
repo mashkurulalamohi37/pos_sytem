@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'dart:io' show Platform;
 import 'firebase_options.dart';
 import 'presentation/screens/login_screen.dart';
@@ -51,8 +51,9 @@ void main() async {
 }
 
 bool _isDesktopPlatform() {
-  return !kDebugMode && 
-    (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+  // Web cannot use dart:io's Platform APIs; treat web as non-desktop
+  if (kIsWeb) return false;
+  return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 }
 
 void _setupDesktopWindow() {

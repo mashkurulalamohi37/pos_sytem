@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:ui' show SystemMouseCursors;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/pos_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -26,9 +27,9 @@ class _CartSidebarState extends ConsumerState<CartSidebar> {
     final customersState = ref.watch(customerProvider);
 
     return Container(
-      width: kIsWeb ? 380 : 400,
+      width: kIsWeb ? 450 : 400,
       constraints: kIsWeb 
-          ? const BoxConstraints(maxWidth: 380, minWidth: 320)
+          ? const BoxConstraints(maxWidth: 450, minWidth: 400)
           : const BoxConstraints(maxWidth: 400),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
@@ -40,7 +41,7 @@ class _CartSidebarState extends ConsumerState<CartSidebar> {
         children: [
           // Cart Header
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(kIsWeb ? 16 : 20),
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
@@ -120,12 +121,12 @@ class _CartSidebarState extends ConsumerState<CartSidebar> {
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(kIsWeb ? 12 : 16),
                     itemCount: posState.cartItems.length,
                     itemBuilder: (context, index) {
                       final item = posState.cartItems[index];
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
+                        padding: EdgeInsets.only(bottom: kIsWeb ? 8 : 12),
                         child: CartItemWidget(
                           item: item,
                           onQuantityChanged: (productId, quantity) {
@@ -162,7 +163,7 @@ class _CartSidebarState extends ConsumerState<CartSidebar> {
                 // Customer Selection
                 if (authState.user?.isAdmin == true || authState.user?.isManager == true)
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(kIsWeb ? 12 : 16),
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
                       border: Border(
@@ -254,9 +255,95 @@ class _CartSidebarState extends ConsumerState<CartSidebar> {
                       ],
                     ),
                   ),
+                // Overall Discount Section
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: kIsWeb ? 16 : 20, 
+                    vertical: kIsWeb ? 10 : 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey.shade300, width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Overall Discount',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      // Show discount amount if applied, otherwise show Add button
+                      posState.discountAmount > 0
+                          ? GestureDetector(
+                              onTap: () => _showOverallDiscountDialog(context),
+                              child: MouseRegion(
+                                cursor: SystemMouseCursors.click,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.red.shade200),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'TK ${posState.discountAmount.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          color: Colors.red.shade700,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(Icons.edit, size: 14, color: Colors.blue.shade700),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )
+                          : GestureDetector(
+                              onTap: () => _showOverallDiscountDialog(context),
+                              child: MouseRegion(
+                                cursor: SystemMouseCursors.click,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.blue.shade200),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.add, size: 16, color: Colors.blue.shade700),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Add',
+                                        style: TextStyle(
+                                          color: Colors.blue.shade700,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                    ],
+                  ),
+                ),
                 // Totals
                 Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: EdgeInsets.all(kIsWeb ? 16 : 20),
                   child: Column(
                     children: [
                       _buildTotalRow('Subtotal', posState.subtotal, false),
@@ -271,7 +358,7 @@ class _CartSidebarState extends ConsumerState<CartSidebar> {
                 ),
                 // Checkout Button
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(kIsWeb ? 12 : 16),
                   color: Colors.white,
                   child: SizedBox(
                     width: double.infinity,
@@ -400,6 +487,137 @@ class _CartSidebarState extends ConsumerState<CartSidebar> {
       default:
         return Icons.payment;
     }
+  }
+
+  void _showOverallDiscountDialog(BuildContext context) {
+    final posState = ref.read(posProvider);
+    DiscountType selectedType = posState.discountType;
+    final amountController = TextEditingController(
+      text: posState.discountType == DiscountType.fixed && posState.discountValue > 0
+          ? posState.discountValue.toString()
+          : '',
+    );
+    final percentageController = TextEditingController(
+      text: posState.discountType == DiscountType.percentage && posState.discountValue > 0
+          ? posState.discountValue.toString()
+          : '',
+    );
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Apply Overall Discount'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Discount Type Selection
+                  const Text(
+                    'Discount Type:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  SegmentedButton<DiscountType>(
+                    segments: const [
+                      ButtonSegment<DiscountType>(
+                        value: DiscountType.none,
+                        label: Text('None'),
+                      ),
+                      ButtonSegment<DiscountType>(
+                        value: DiscountType.fixed,
+                        label: Text('TK'),
+                      ),
+                      ButtonSegment<DiscountType>(
+                        value: DiscountType.percentage,
+                        label: Text('%'),
+                      ),
+                    ],
+                    selected: {selectedType},
+                    onSelectionChanged: (Set<DiscountType> newSelection) {
+                      setState(() {
+                        selectedType = newSelection.first;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  // Fixed Amount Input
+                  if (selectedType == DiscountType.fixed) ...[
+                    TextField(
+                      controller: amountController,
+                      decoration: const InputDecoration(
+                        labelText: 'Discount Amount (TK)',
+                        prefixIcon: Icon(Icons.currency_exchange),
+                        border: OutlineInputBorder(),
+                        hintText: 'Enter discount amount',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ],
+                  // Percentage Input
+                  if (selectedType == DiscountType.percentage) ...[
+                    TextField(
+                      controller: percentageController,
+                      decoration: const InputDecoration(
+                        labelText: 'Discount Percentage (%)',
+                        prefixIcon: Icon(Icons.percent),
+                        border: OutlineInputBorder(),
+                        hintText: 'Enter percentage (0-100)',
+                        suffixText: '%',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  double value = 0.0;
+                  
+                  if (selectedType == DiscountType.fixed) {
+                    value = double.tryParse(amountController.text) ?? 0.0;
+                    if (value < 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Discount amount cannot be negative'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+                  } else if (selectedType == DiscountType.percentage) {
+                    value = double.tryParse(percentageController.text) ?? 0.0;
+                    if (value < 0 || value > 100) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Percentage must be between 0 and 100'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+                  }
+                  
+                  ref.read(posProvider.notifier).setDiscount(selectedType, value);
+                  Navigator.pop(context);
+                },
+                child: const Text('Apply'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 

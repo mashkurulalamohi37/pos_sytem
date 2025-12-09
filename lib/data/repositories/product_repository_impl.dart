@@ -10,9 +10,13 @@ class ProductRepositoryImpl implements ProductRepository {
   ProductRepositoryImpl(this._db);
 
   @override
-  Future<List<domain.Product>> getProducts({int? categoryId, String? search}) async {
-    var query = _db.select(_db.products)
-      ..where((p) => p.isActive.equals(true));
+  Future<List<domain.Product>> getProducts({int? categoryId, bool includeInactive = false, String? search}) async {
+    var query = _db.select(_db.products);
+    
+    // Only filter by active status if we don't want inactive products
+    if (!includeInactive) {
+      query = query..where((p) => p.isActive.equals(true));
+    }
 
     if (categoryId != null) {
       query = query..where((p) => p.categoryId.equals(categoryId));

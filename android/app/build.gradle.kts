@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.example.aronium"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -25,7 +25,7 @@ android {
         applicationId = "com.example.aronium"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23  // Firebase Auth requires minSdk 23
+        minSdk = 23  // Firebase Auth requires minSdk 23, mobile_scanner supports 21+
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

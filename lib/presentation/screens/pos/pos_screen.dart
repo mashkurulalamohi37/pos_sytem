@@ -6,6 +6,7 @@ import '../../providers/product_provider.dart';
 import '../../../domain/entities/product.dart';
 import '../../../domain/entities/category.dart';
 import '../../widgets/barcode_scanner_widget.dart';
+import '../../widgets/barcode_scanner_settings_widget.dart';
 import 'product_grid_section.dart';
 import 'cart_screen.dart';
 import 'cart_sidebar.dart';
@@ -129,6 +130,23 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.grey.shade900,
         actions: [
+          if (kIsWeb) ...[
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () {
+                  _showScannerSettings(context);
+                },
+                tooltip: 'Scanner Settings',
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ],
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
@@ -618,6 +636,15 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             }
           },
         ),
+      ),
+    );
+  }
+
+  Future<void> _showScannerSettings(BuildContext context) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const BarcodeScannerSettingsWidget(),
       ),
     );
   }
