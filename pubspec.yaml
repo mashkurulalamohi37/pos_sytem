@@ -79,6 +79,10 @@ dependencies:
       path: plugins/window_size
       ref: 6c66ad23ee79749f30a8eece542cf54eaf157ed8
   qr_flutter: ^4.1.0
+  
+  # Web APIs (for barcode scanner connectivity)
+  web: ^1.1.0
+
 
 dev_dependencies:
   flutter_test:

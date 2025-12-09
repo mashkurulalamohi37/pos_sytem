@@ -11,6 +11,8 @@ class BarcodeScannerSettingsWidget extends StatefulWidget {
   State<BarcodeScannerSettingsWidget> createState() => _BarcodeScannerSettingsWidgetState();
 }
 
+enum ConnectionType { keyboard, usb, bluetooth, wifi }
+
 class _BarcodeScannerSettingsWidgetState extends State<BarcodeScannerSettingsWidget> {
   bool _externalScannerEnabled = false;
   bool _externalScannerConnected = false;
@@ -23,6 +25,15 @@ class _BarcodeScannerSettingsWidgetState extends State<BarcodeScannerSettingsWid
   String _lastScannedBarcode = '';
   StreamSubscription<String>? _testSubscription;
   Timer? _testTimeoutTimer;
+  
+  // Connection type selection
+  ConnectionType _selectedConnectionType = ConnectionType.keyboard;
+  bool _isConnecting = false;
+  String _connectionStatus = 'Not Connected';
+  
+  // WiFi scanner settings
+  final _wifiUrlController = TextEditingController();
+  int _wifiPollingInterval = 500; // milliseconds
 
   // Settings keys
   static const String _keyEnabled = 'barcode_scanner_enabled';
@@ -40,6 +51,7 @@ class _BarcodeScannerSettingsWidgetState extends State<BarcodeScannerSettingsWid
   void dispose() {
     _testSubscription?.cancel();
     _testTimeoutTimer?.cancel();
+    _wifiUrlController.dispose();
     super.dispose();
   }
 
@@ -366,6 +378,273 @@ class _BarcodeScannerSettingsWidgetState extends State<BarcodeScannerSettingsWid
     _saveSettings();
   }
 
+  Future<void> _connectScanner() async {
+    setState(() => _isConnecting = true);
+
+    try {
+      bool connected = false;
+      
+      switch (_selectedConnectionType) {
+        case ConnectionType.usb:
+          connected = await _connectUsb();
+          break;
+        case ConnectionType.bluetooth:
+          connected = await _connectBluetooth();
+          break;
+        case ConnectionType.wifi:
+          connected = await _connectWifi();
+          break;
+        case ConnectionType.keyboard:
+          connected = await _connectKeyboard();
+          break;
+      }
+
+      if (mounted) {
+        setState(() {
+          _externalScannerConnected = connected;
+          _isConnecting = false;
+          if (connected) {
+            _connectionStatus = _getConnectionStatusText();
+          }
+        });
+
+        if (connected) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Connected via ${_getConnectionTypeText()}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isConnecting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connection failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<bool> _connectUsb() async {
+    // Note: This requires the web package and proper implementation
+    // For now, show a message
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('USB connection requires WebUSB API support. Click to grant permission.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+    // In real implementation, call:
+    // return await ExternalBarcodeScannerService.instance.connectUsb();
+    return false; // Placeholder
+  }
+
+  Future<bool> _connectBluetooth() async {
+    // Note: This requires the web package and proper implementation
+    // For now, show a message
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bluetooth connection requires Web Bluetooth API. Click to pair device.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+    // In real implementation, call:
+    // return await ExternalBarcodeScannerService.instance.connectBluetooth();
+    return false; // Placeholder
+  }
+
+  Future<bool> _connectWifi() async {
+    final url = _wifiUrlController.text.trim();
+    if (url.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter scanner URL'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return false;
+    }
+
+    // Validate URL format
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('URL must start with http:// or https://'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return false;
+    }
+
+    // In real implementation, call:
+    // return await ExternalBarcodeScannerService.instance.connectWifi(url);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Connecting to WiFi scanner at $url...'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+    return false; // Placeholder
+  }
+
+  Future<bool> _connectKeyboard() async {
+    // Keyboard mode is always available
+    final isConnected = await ExternalBarcodeScannerService.instance.isScannerConnected();
+    return isConnected;
+  }
+
+  Future<void> _disconnectScanner() async {
+    setState(() => _isConnecting = true);
+
+    try {
+      // In real implementation, call:
+      // await ExternalBarcodeScannerService.instance.disconnectAll();
+      
+      if (mounted) {
+        setState(() {
+          _externalScannerConnected = false;
+          _externalScannerEnabled = false;
+          _connectionStatus = 'Not Connected';
+          _isConnecting = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Scanner disconnected'),
+            backgroundColor: Colors.grey,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isConnecting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Disconnect failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getConnectionTypeText() {
+    switch (_selectedConnectionType) {
+      case ConnectionType.usb:
+        return 'USB';
+      case ConnectionType.bluetooth:
+        return 'Bluetooth';
+      case ConnectionType.wifi:
+        return 'WiFi/Network';
+      case ConnectionType.keyboard:
+        return 'Keyboard (HID)';
+    }
+  }
+
+  String _getConnectionStatusText() {
+    if (!_externalScannerConnected) {
+      return 'Not Connected';
+    }
+    return 'Connected via ${_getConnectionTypeText()}';
+  }
+
+  Widget _buildConnectionTypeOption(
+    ConnectionType type,
+    String title,
+    String description,
+    IconData icon,
+  ) {
+    final isSelected = _selectedConnectionType == type;
+    
+    return InkWell(
+      onTap: _externalScannerConnected ? null : () {
+        setState(() {
+          _selectedConnectionType = type;
+        });
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(8),
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary.withOpacity(0.05)
+              : null,
+        ),
+        child: Row(
+          children: [
+            Radio<ConnectionType>(
+              value: type,
+              groupValue: _selectedConnectionType,
+              onChanged: _externalScannerConnected ? null : (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedConnectionType = value;
+                  });
+                }
+              },
+            ),
+            Icon(
+              icon,
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.grey,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!kIsWeb) {
@@ -438,7 +717,126 @@ class _BarcodeScannerSettingsWidgetState extends State<BarcodeScannerSettingsWid
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Scanner Status Card
+              // Connection Type Selection Card
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.cable,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Connection Type',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Select how your barcode scanner connects:',
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Connection Type Radio Buttons
+                      _buildConnectionTypeOption(
+                        ConnectionType.keyboard,
+                        'Keyboard (HID)',
+                        'Traditional keyboard emulation - works with all browsers',
+                        Icons.keyboard,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildConnectionTypeOption(
+                        ConnectionType.usb,
+                        'USB Scanner',
+                        'Direct USB connection via WebUSB API (Chrome/Edge only)',
+                        Icons.usb,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildConnectionTypeOption(
+                        ConnectionType.bluetooth,
+                        'Bluetooth Scanner',
+                        'Wireless connection via Web Bluetooth API (Chrome/Edge only)',
+                        Icons.bluetooth,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildConnectionTypeOption(
+                        ConnectionType.wifi,
+                        'WiFi/Network Scanner',
+                        'HTTP-based network scanner with custom endpoint',
+                        Icons.wifi,
+                      ),
+                      
+                      // WiFi URL Configuration (only shown when WiFi is selected)
+                      if (_selectedConnectionType == ConnectionType.wifi) ...[
+                        const SizedBox(height: 20),
+                        const Divider(),
+                        const SizedBox(height: 16),
+                        Text(
+                          'WiFi Scanner Configuration',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _wifiUrlController,
+                          decoration: InputDecoration(
+                            labelText: 'Scanner URL',
+                            hintText: 'http://192.168.1.100',
+                            prefixIcon: const Icon(Icons.link),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            helperText: 'Enter the HTTP endpoint of your network scanner',
+                          ),
+                          keyboardType: TextInputType.url,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Polling Interval: $_wifiPollingInterval ms',
+                                style: const TextStyle(fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Slider(
+                          value: _wifiPollingInterval.toDouble(),
+                          min: 100,
+                          max: 5000,
+                          divisions: 49,
+                          label: '$_wifiPollingInterval ms',
+                          onChanged: (value) {
+                            setState(() {
+                              _wifiPollingInterval = value.round();
+                            });
+                          },
+                        ),
+                        const Text(
+                          'How often to check for new scans',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Scanner Status and Connection Card
               Card(
                 elevation: 2,
                 child: Padding(
@@ -458,8 +856,8 @@ class _BarcodeScannerSettingsWidgetState extends State<BarcodeScannerSettingsWid
                             ),
                             child: Icon(
                               _externalScannerConnected
-                                  ? Icons.scanner
-                                  : Icons.scanner_outlined,
+                                  ? Icons.check_circle
+                                  : Icons.radio_button_unchecked,
                               color: _externalScannerConnected ? Colors.green : Colors.grey,
                               size: 28,
                             ),
@@ -470,38 +868,21 @@ class _BarcodeScannerSettingsWidgetState extends State<BarcodeScannerSettingsWid
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'External Scanner Status',
+                                  'Scanner Status',
                                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
                                       ),
                                 ),
                                 const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 10,
-                                      height: 10,
-                                      decoration: BoxDecoration(
-                                        color: _externalScannerConnected
-                                            ? Colors.green
-                                            : Colors.grey,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      _externalScannerConnected
-                                          ? 'Ready'
-                                          : 'Not Connected',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        color: _externalScannerConnected
-                                            ? Colors.green
-                                            : Colors.grey[600],
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  _connectionStatus,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: _externalScannerConnected
+                                        ? Colors.green
+                                        : Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
                                 ),
                               ],
                             ),
@@ -509,43 +890,62 @@ class _BarcodeScannerSettingsWidgetState extends State<BarcodeScannerSettingsWid
                         ],
                       ),
                       const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _isChecking ? null : _checkForScanners,
-                              icon: _isChecking
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(Colors.white),
-                                      ),
-                                    )
-                                  : const Icon(Icons.refresh),
-                              label: Text(_isChecking ? 'Checking...' : 'Check for Scanners'),
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
+                      
+                      // Connect/Disconnect Buttons
+                      if (!_externalScannerConnected) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _isConnecting ? null : _connectScanner,
+                            icon: _isConnecting
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Icon(Icons.link),
+                            label: Text(_isConnecting ? 'Connecting...' : 'Connect Scanner'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Colors.white,
                             ),
                           ),
-                          if (_externalScannerConnected) ...[
+                        ),
+                      ] else ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _externalScannerEnabled ? _testScanner : null,
+                                icon: const Icon(Icons.qr_code_scanner),
+                                label: const Text('Test Scanner'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
                             const SizedBox(width: 12),
-                            ElevatedButton.icon(
-                              onPressed: _externalScannerEnabled ? _testScanner : null,
-                              icon: const Icon(Icons.qr_code_scanner),
-                              label: const Text('Test'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _isConnecting ? null : _disconnectScanner,
+                                icon: const Icon(Icons.link_off),
+                                label: const Text('Disconnect'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                ),
                               ),
                             ),
                           ],
-                        ],
-                      ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
